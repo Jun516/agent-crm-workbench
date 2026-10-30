@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Task-scoped MCP tool grants",
+    "subtitle": "Exact names narrow existing role, scope and tenant checks",
+    "output": "mcp-tool-grants.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "operator", "label": "Existing configuration surfaces" },
+    { "id": "runtime", "label": "Task authorization" },
+    { "id": "execution", "label": "MCP execution and audit" }
+  ],
+  "mainPath": ["selection", "mint", "manifest", "bridge", "handler"],
+  "nodes": [
+    {
+      "id": "selection",
+      "lane": "operator",
+      "col": 0,
+      "type": "service",
+      "label": "Published Agent tool selection + Harness filters"
+    },
+    {
+      "id": "mint",
+      "lane": "runtime",
+      "col": 1,
+      "type": "service",
+      "label": "buildEphemeralTokenScopes"
+    },
+    {
+      "id": "manifest",
+      "lane": "runtime",
+      "col": 2,
+      "type": "service",
+      "label": "api_tokens exact tool manifest"
+    },
+    {
+      "id": "bridge",
+      "lane": "execution",
+      "col": 3,
+      "type": "service",
+      "label": "Internal bridge or Streamable HTTP MCP"
+    },
+    {
+      "id": "handler",
+      "lane": "execution",
+      "col": 4,
+      "type": "service",
+      "label": "Role + scope + exact tool + business resource checks"
+    },
+    {
+      "id": "audit",
+      "lane": "operator",
+      "col": 5,
+      "type": "service",
+      "label": "Existing token list and MCP tool audit"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": "selection", "to": "mint", "label": "current task tool names" },
+    {
+      "id": "e2",
+      "from": "mint",
+      "to": "manifest",
+      "label": "hash-only token, short TTL, explicit empty denied"
+    },
+    {
+      "id": "e3",
+      "from": "manifest",
+      "to": "bridge",
+      "label": "advertise and mount authorized names"
+    },
+    {
+      "id": "e4",
+      "from": "bridge",
+      "to": "handler",
+      "label": "repeat authorization at invocation"
+    },
+    {
+      "id": "e5",
+      "from": "handler",
+      "to": "audit",
+      "label": "existing successful and denied tool observations"
+    },
+    {
+      "id": "e6",
+      "from": "manifest",
+      "to": "audit",
+      "label": "scopes visible in existing token list"
+    },
+    {
+      "id": "e7",
+      "from": "audit",
+      "to": "selection",
+      "label": "operator diagnoses refusal; no automatic privilege escalation"
+    }
+  ],
+  "cards": []
+}

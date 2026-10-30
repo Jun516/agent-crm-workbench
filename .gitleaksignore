@@ -1,0 +1,25 @@
+# Individually reviewed source/test fixtures and non-secret identifiers.
+# Review record: learn/github-publication/2026-10-30/crm-gitleaks-review.json
+# No directory, regex, or provider-wide exceptions.
+.github/workflows/e2e.yml:curl-auth-header:1539
+app/actions/auth/signInWithPassword.test.ts:generic-api-key:66
+app/api/v1/tenants/provision/route.test.ts:generic-api-key:161
+hostgator-setup-kit/test-validators.sh:curl-auth-header:923
+hostgator-setup-kit/test-validators.sh:generic-api-key:928
+hostgator-setup-kit/test-validators.sh:generic-api-key:946
+lib/ai/integrations/mem0.ts:generic-api-key:402
+lib/followup/gatilho-caso.handler.ts:generic-api-key:23
+lib/followup/gatilho-etapa.handler.ts:generic-api-key:16
+lib/followup/gatilho-presenca.handler.ts:generic-api-key:5
+lib/notifications/prefs.ts:generic-api-key:17
+lib/sentry/scrub.test.ts:generic-api-key:12
+supabase/migrations/MANIFEST.md:generic-api-key:188
+tests/invariants/webhooks-inbound.test.ts:generic-api-key:361
+tests/invariants/webhooks-secret-encryption.test.ts:generic-api-key:25
+tests/shell/senha-do-cron-vazada.test.sh:generic-api-key:74
+tests/sonda-radar-isolamento-orgs.ts:jwt:34
+tests/unit/app-da-meta-tela-nao-devolve-segredo.test.tsx:generic-api-key:216
+tests/unit/credenciais-ia-rotacao.test.ts:generic-api-key:15
+tests/unit/cron-auth.test.ts:generic-api-key:59
+tests/unit/cron-auth.test.ts:generic-api-key:9
+tests/unit/onboarding-chave-da-ia-vale-para-a-empresa.test.ts:generic-api-key:179

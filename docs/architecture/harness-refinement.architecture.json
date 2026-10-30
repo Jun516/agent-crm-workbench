@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Bounded read-only Harness refinement",
+    "subtitle": "Fixed model weights; deterministic probes and low-authority process lessons",
+    "output": "harness-refinement.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "ui", "label": "Operator" },
+    { "id": "runtime", "label": "Authorized execution" },
+    { "id": "data", "label": "Durable runs and evidence" }
+  ],
+  "mainPath": ["workbench", "api", "worker", "branches", "probe", "parent"],
+  "nodes": [
+    {
+      "id": "workbench",
+      "lane": "ui",
+      "col": 0,
+      "type": "service",
+      "label": "Workbench task settings",
+      "sublabel": "RefinementControls; explicit inspect-only opt-in"
+    },
+    {
+      "id": "api",
+      "lane": "runtime",
+      "col": 0,
+      "type": "service",
+      "label": "Authenticated start API",
+      "sublabel": "Manager, organization, Agent version and finite budget"
+    },
+    {
+      "id": "worker",
+      "lane": "runtime",
+      "col": 1,
+      "type": "service",
+      "label": "Durable root Worker",
+      "sublabel": "Existing lease, cancellation and queue"
+    },
+    {
+      "id": "branches",
+      "lane": "runtime",
+      "col": 2,
+      "type": "service",
+      "label": "Sequential read-only candidates",
+      "sublabel": "Existing specialist runs and Pi; shared allowance"
+    },
+    {
+      "id": "sources",
+      "lane": "data",
+      "col": 1,
+      "type": "service",
+      "label": "Authorized current CRM sources",
+      "sublabel": "Read tools intersect current Agent permissions"
+    },
+    {
+      "id": "probe",
+      "lane": "runtime",
+      "col": 3,
+      "type": "service",
+      "label": "Deterministic Probe",
+      "sublabel": "Reject missing evidence; surface conflicts; coverage tie-break"
+    },
+    {
+      "id": "lessons",
+      "lane": "data",
+      "col": 3,
+      "type": "service",
+      "label": "Enumerated process experience",
+      "sublabel": "Organization + Agent version + revision + seven-day TTL; no customer facts"
+    },
+    {
+      "id": "parent",
+      "lane": "runtime",
+      "col": 4,
+      "type": "service",
+      "label": "Parent synthesis",
+      "sublabel": "Selected candidate, conflicts, remaining budget and independent Eval"
+    },
+    {
+      "id": "events",
+      "lane": "data",
+      "col": 4,
+      "type": "service",
+      "label": "Run state and redacted events",
+      "sublabel": "Candidate reports, round records and policy_checked gate"
+    }
+  ],
+  "edges": [
+    { "id": "r1", "from": "workbench", "to": "api", "label": "explicit bounded options" },
+    { "id": "r2", "from": "api", "to": "worker", "label": "persist and enqueue" },
+    { "id": "r3", "from": "worker", "to": "branches", "label": "lease and shared budget checks" },
+    { "id": "r4", "from": "sources", "to": "branches", "label": "tool observations" },
+    {
+      "id": "r5",
+      "from": "branches",
+      "to": "probe",
+      "label": "durable results and structured claims"
+    },
+    {
+      "id": "r6",
+      "from": "probe",
+      "to": "lessons",
+      "label": "discarded branch process codes only"
+    },
+    {
+      "id": "r7",
+      "from": "lessons",
+      "to": "branches",
+      "label": "low-authority guidance for next round"
+    },
+    { "id": "r8", "from": "probe", "to": "parent", "label": "winner and all conflicts" },
+    { "id": "r9", "from": "parent", "to": "events", "label": "result and usage" },
+    { "id": "r10", "from": "probe", "to": "events", "label": "iteration and selection metadata" },
+    {
+      "id": "r11",
+      "from": "events",
+      "to": "workbench",
+      "label": "existing timeline and specialist list"
+    }
+  ],
+  "cards": []
+}

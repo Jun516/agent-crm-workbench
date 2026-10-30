@@ -1,0 +1,17 @@
+{
+  "kind": "original-archive-red-control",
+  "expected_exit_nonzero": true,
+  "tested_files": [
+    "lib/ai/integrations/weknora.ts",
+    "lib/ai/integrations/mem0.ts",
+    "lib/mcp/tools/contacts.ts"
+  ],
+  "exit_code": 1,
+  "old_implementation_rejected": true,
+  "restored_sha256": {
+    "lib/ai/integrations/weknora.ts": "1f35085ab1ca006c68ddc5da729e19cc11db2ab6bfb32eca7ca02d16d4b495b2",
+    "lib/ai/integrations/mem0.ts": "63b19bf887271005172b3909776aae8a1b463bff870d0888da2338f9ec7e79f6",
+    "lib/mcp/tools/contacts.ts": "ced462e7fa1be637783245efcd0364ad4bc18961d537805fc333bc8889f934e3"
+  },
+  "restore_matches": true
+}
