@@ -1,5 +1,7 @@
 # HANDOFF — Follow-up Vivo
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Documento vivo da missão "otimizar o sistema de follow-ups". Atualizado a **cada
 > avanço, interrupção, bug encontrado, bug corrigido e pendência**. Quem retoma
 > esta missão lê este arquivo primeiro e não precisa de mais nada.
@@ -246,9 +248,9 @@ Received:   360.02346666666665
 o usuário perceber. Evidência visual versionada, uma imagem para cada metade da
 contradição:
 
-- `evidence/followup-vivo/tempo-adaptativo-01-a-promessa-da-tela.png` — o painel
+- evidence/followup-vivo/tempo-adaptativo-01-a-promessa-da-tela.png — o painel
   com a janela de 10 a 360 min e a orientação escrita, que é o que o operador vê.
-- `evidence/followup-vivo/tempo-adaptativo-02-o-que-o-motor-agendou.png` — a Fila
+- evidence/followup-vivo/tempo-adaptativo-02-o-que-o-motor-agendou.png — a Fila
   mostrando o disparo no teto, que é o que o motor fez.
 
 > Citadas aqui pelo caminho, e não pela pasta, porque
@@ -275,15 +277,15 @@ derivada do schema (`tests/support/enums-do-grafo.ts`), não escrita à mão.
 Uma captura por tipo de nó, que é a unidade da afirmação — se um painel voltar a
 falar em código, é numa destas que se vê:
 
-- `evidence/followup-vivo/linguagem-painel-trigger.png`
-- `evidence/followup-vivo/linguagem-painel-wait.png` — "Como calcular a espera",
+- evidence/followup-vivo/linguagem-painel-trigger.png
+- evidence/followup-vivo/linguagem-painel-wait.png — "Como calcular a espera",
   onde antes se lia "Modo" e "Adaptativo (min–max)".
-- `evidence/followup-vivo/linguagem-painel-condition.png` — o seletor que
+- evidence/followup-vivo/linguagem-painel-condition.png — o seletor que
   mostrava `lead_stage` e `eq`, agora com a frase inteira da condição embaixo.
-- `evidence/followup-vivo/linguagem-painel-ai_classify.png` — o antigo "Grace".
-- `evidence/followup-vivo/linguagem-painel-action.png` — onde estavam os dois
+- evidence/followup-vivo/linguagem-painel-ai_classify.png — o antigo "Grace".
+- evidence/followup-vivo/linguagem-painel-action.png — onde estavam os dois
   campos de UUID de template.
-- `evidence/followup-vivo/linguagem-painel-end.png`
+- evidence/followup-vivo/linguagem-painel-end.png
 
 Verde de varredura só vale se ela souber ficar vermelha: injetando na lista de
 proibidos uma palavra que ESTÁ na tela ("Rótulo"), a spec reprovou uma vez e
@@ -608,31 +610,31 @@ chega depois não sabe se aquilo prova algo ou se foi esquecido.
 
 ### Ramificação — uma saída por regra (`evidence/followup-vivo/`)
 
-- **`evidence/followup-vivo/ramos-01-uma-bolinha-por-regra.png`** — o nó de condição com duas regras mostra
+- **evidence/followup-vivo/ramos-01-uma-bolinha-por-regra.png** — o nó de condição com duas regras mostra
   **três saídas separadas**, cada uma com nome legível: *"Tem a etiqueta VIP"*,
   *"Tem a etiqueta atrasado"* e *"Nenhuma delas"*. É a queixa original do responsável pelo produto
   resolvida na tela; antes havia **uma bolinha só** para todas as saídas.
-- **`evidence/followup-vivo/ramos-02-altura-com-5-regras.png`** — o card com cinco regras, usado para medir
+- **evidence/followup-vivo/ramos-02-altura-com-5-regras.png** — o card com cinco regras, usado para medir
   a altura por ferramenta (43,4px com uma saída → 159,1px com cinco, custo por ramo
   de 19,3px). Registra a decisão de **não** esconder ramo atrás de um "+2 mais":
   ramo escondido perde a bolinha, que é o defeito que a wave conserta.
-- **`evidence/followup-vivo/ramos-03-publicado.png`** — o fluxo com ramos nomeados **publicado**, provando
+- **evidence/followup-vivo/ramos-03-publicado.png** — o fluxo com ramos nomeados **publicado**, provando
   que `validateFlowForPublish` aceita a forma nova e exige cobertura por ramo.
-- **`evidence/followup-vivo/ramos-04-dois-leads-dois-caminhos.png`** — dois leads com etiquetas diferentes
+- **evidence/followup-vivo/ramos-04-dois-leads-dois-caminhos.png** — dois leads com etiquetas diferentes
   terminando em **nós diferentes**. É a prova de que a bolinha não é enfeite: o
   roteamento por `branch_id` decide o caminho de verdade.
 
 ### Gatilho de caso aberto (`evidence/gatilho-de-caso/`)
 
-- **`evidence/gatilho-de-caso/caso-01-gatilho-armado.png`** — o gatilho "Agente pediu ajuda" escolhido
+- **evidence/gatilho-de-caso/caso-01-gatilho-armado.png** — o gatilho "Agente pediu ajuda" escolhido
   pela tela, com o aviso em destaque para começar o fluxo por uma espera. O aviso
   não é dica: abrir um caso não cala o agente, e sem espera o cliente receberia
   duas mensagens ao mesmo tempo.
-- **`evidence/gatilho-de-caso/caso-02-publicado.png`** — o fluxo publicado com `kind='case_opened'`, que
+- **evidence/gatilho-de-caso/caso-02-publicado.png** — o fluxo publicado com `kind='case_opened'`, que
   até esta sessão o publish recusava por não haver produtor.
-- **`evidence/gatilho-de-caso/caso-03-fila-com-o-followup.png`** — o follow-up na fila, nascido do caso
+- **evidence/gatilho-de-caso/caso-03-fila-com-o-followup.png** — o follow-up na fila, nascido do caso
   que o agente abriu, sem ninguém apertar nada.
-- **`evidence/gatilho-de-caso/caso-04-cancelado-apos-resolver.png`** — o outro lado do laço: resolver o
+- **evidence/gatilho-de-caso/caso-04-cancelado-apos-resolver.png** — o outro lado do laço: resolver o
   caso deixa o follow-up **marcado como Cancelado**, e não some da fila. A
   primeira versão da spec cobrava desaparecimento e reprovou — o mecanismo estava
   certo e a asserção errada: linha que evapora não deixa o operador saber o que
@@ -640,19 +642,19 @@ chega depois não sabe se aquilo prova algo ou se foi esquecido.
 
 ### Gatilho de etapa (`evidence/gatilho-de-etapa/`)
 
-- **`evidence/gatilho-de-etapa/gatilho-etapa-01-configurado.png`** — o gatilho "Etapa do funil" armado pela
+- **evidence/gatilho-de-etapa/gatilho-etapa-01-configurado.png** — o gatilho "Etapa do funil" armado pela
   tela, com o seletor mostrando a etapa **pelo nome**, agrupada por funil — nunca
   UUID — e o rótulo prometendo "poucos minutos" em vez de "na hora", porque o
   produtor roda no tick do cron.
-- **`evidence/gatilho-de-etapa/gatilho-etapa-02-publicado.png`** — o fluxo publicado com `kind='stage_change'`,
+- **evidence/gatilho-de-etapa/gatilho-etapa-02-publicado.png** — o fluxo publicado com `kind='stage_change'`,
   que até esta missão o publish **recusava** por não haver produtor.
-- **`evidence/gatilho-de-etapa/gatilho-etapa-03-antes-do-movimento.png`** — o estado da fila **antes** de mover
+- **evidence/gatilho-de-etapa/gatilho-etapa-03-antes-do-movimento.png** — o estado da fila **antes** de mover
   o lead, que é o controle: sem ele, um enrollment pré-existente seria lido como
   efeito do gatilho.
-- **`evidence/gatilho-de-etapa/gatilho-etapa-04-depois-do-movimento.png`** — o quadro **depois** do arrasto,
+- **evidence/gatilho-de-etapa/gatilho-etapa-04-depois-do-movimento.png** — o quadro **depois** do arrasto,
   com o card na etapa que arma o gatilho. O movimento é pelo teclado, que é a via
   acessível do mesmo `onDragEnd` do mouse — não um atalho por API.
-- **`evidence/gatilho-de-etapa/gatilho-etapa-05-fila-com-o-followup.png`** — o follow-up **na fila**, nascido do
+- **evidence/gatilho-de-etapa/gatilho-etapa-05-fila-com-o-followup.png** — o follow-up **na fila**, nascido do
   movimento, sem ninguém apertar nada. Esta é a tela que fecha a jornada, e
   nenhuma execução tinha chegado até ela: a spec parava três passos antes.
   Proveniência conferida no banco — o evento do enrollment é

@@ -1,5 +1,7 @@
 # HANDOFF — A conversa vira lead (spec 17)
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Branch `feat/conversa-vira-lead`, empilhada sobre `feat/tres-papeis-do-agente` (spec 16, PR #181).
 > Worktree `/Users/helsome/pi-native-crm-tres-papeis`. Spec:
 > [`docs/specs/17-spec-conversa-vira-lead.md`](../specs/17-spec-conversa-vira-lead.md).
@@ -96,7 +98,7 @@ sobre a origem e provaria só que a tela desenha uma linha que alguém pôs no b
 | 2 | a timeline diz **"Entrou pelo WhatsApp"** |
 | 3 | a segunda mensagem do mesmo contato **não** abre um segundo card |
 
-Evidência: [`evidence/spec-17/card-nascido-da-conversa.png`](../../evidence/spec-17/card-nascido-da-conversa.png).
+Evidência: evidence/spec-17/card-nascido-da-conversa.png.
 Registrada no CI (`e2e.yml`, parte 1) e no mapa de jornadas (J4.22–J4.25).
 
 Ambiente: Supabase local (`.env.e2e`, 127.0.0.1:54321) + `next build` + `next start`. **Sem
@@ -134,7 +136,7 @@ quais colunas são geradas e varre `app/`, `lib/`, `scripts/`. O detector custou
 primeira acusou 11 falsos positivos (declaração de tipo, montagem de resposta HTTP), e gate que
 grita onde não há defeito é gate que alguém desliga.
 
-Prova de tela: [`evidence/spec-17/contato-com-email-salvo.png`](../../evidence/spec-17/contato-com-email-salvo.png)
+Prova de tela: evidence/spec-17/contato-com-email-salvo.png
 (`contato-salva-email.spec.ts`, J4.26–J4.27).
 
 ### Fatia B — o telefone que sempre chegou (migration 0122)
@@ -287,7 +289,7 @@ no cadastro com base legal (`transactional`, L-05) e auditoria dos dois lados (L
 decide **vence** — porque prazo que ninguém cobre é pior que prazo nenhum: promete um limite que não
 existe e a pendência vira badge permanente, que simula atenção e adia a decisão.
 
-Prova de tela: [`evidence/spec-17/proposta-confirmada.png`](../../evidence/spec-17/proposta-confirmada.png)
+Prova de tela: evidence/spec-17/proposta-confirmada.png
 (`confirmar-dado-do-contato.spec.ts`, J4.28–J4.30).
 
 **O e2e passou pelo motivo errado na primeira versão**, e só a evidência pegou: `getByText(email)`
@@ -443,10 +445,10 @@ devoluções" — que diz que o assistente qualifica cedo demais, e o dono sabe 
 linha 243) — prova nova fora do gate seria repetir o defeito que o spec do Operador registra.
 
 A marcação nasce fechada e a tela **explica** em vez de deixar em branco:
-[`evidence/spec-17/escopo-nasce-fechado.png`](../../evidence/spec-17/escopo-nasce-fechado.png). Depois de
+evidence/spec-17/escopo-nasce-fechado.png. Depois de
 marcar, salvar e **recarregar**, ela sobrevive — e o funil marcado sem tradução mostra a cobrança do
 passo 4 ao lado do nome:
-[`evidence/spec-17/escopo-sobrevive-ao-reload.png`](../../evidence/spec-17/escopo-sobrevive-ao-reload.png).
+evidence/spec-17/escopo-sobrevive-ao-reload.png.
 
 **O que as duas falhas do CI eram, e o que elas ensinaram.** Nenhuma era do produto:
 

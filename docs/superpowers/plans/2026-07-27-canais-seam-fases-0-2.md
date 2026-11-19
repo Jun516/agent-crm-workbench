@@ -1,5 +1,7 @@
 # Seam de Canais (Fases 0–2) — Implementation Plan
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Abrir o seam de canal no pi-native-crm — capabilities declarativas, WAHA como primeiro adapter, `provider` no schema e lint anti-vazamento — **sem alterar um único comportamento visível ao usuário**.
@@ -119,13 +121,13 @@ Expected: ambos verdes. **Se algo já está vermelho na `main`, PARE** — conse
 
 Playwright dirigindo o frontend com a conta real de `.e2e-creds.json`. Screenshot em cada parada:
 
-1. login → `evidence/canais/baseline/01-login.png`
-2. conectar WhatsApp (QR aparece) → `evidence/canais/baseline/02-qr.png`
-3. inbox com conversa → `evidence/canais/baseline/03-inbox.png`
-4. enviar texto pelo inbox → `evidence/canais/baseline/04-texto-enviado.png`
-5. enviar áudio → `evidence/canais/baseline/05-audio-enviado.png`
-6. agendar follow-up → `evidence/canais/baseline/06-followup.png`
-7. Radar de Risco carregado → `evidence/canais/baseline/07-radar.png`
+1. login → evidence/canais/baseline/01-login.png
+2. conectar WhatsApp (QR aparece) → evidence/canais/baseline/02-qr.png
+3. inbox com conversa → evidence/canais/baseline/03-inbox.png
+4. enviar texto pelo inbox → evidence/canais/baseline/04-texto-enviado.png
+5. enviar áudio → evidence/canais/baseline/05-audio-enviado.png
+6. agendar follow-up → evidence/canais/baseline/06-followup.png
+7. Radar de Risco carregado → evidence/canais/baseline/07-radar.png
 
 - [ ] **Step 5: Gravar o trace da cadeia before_send**
 

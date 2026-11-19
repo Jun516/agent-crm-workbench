@@ -1,5 +1,7 @@
 # HANDOFF — Índice de Atrito (spec 17)
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > **Leia este arquivo no início de qualquer sessão que continue este trabalho.**
 > Alimente-o a cada avanço: o que foi feito, o que foi **provado** (com evidência
 > observada), bug encontrado, e o que ficou pendente. Progresso sem prova não
@@ -512,7 +514,7 @@ jargao:  []      scroll_horizontal: false      erros de console: nenhum
 ```
 
 `tests/sonda-capacidade-radar-tela.ts` · evidência em
-`evidence/passo4-capacidade-radar.png` · 6/6, exit 0.
+evidence/passo4-capacidade-radar.png · 6/6, exit 0.
 
 **Duas armadilhas de ambiente, ambas diagnosticadas e não chutadas:** o
 `e2e-admin` tem MFA forçado (doutrina) e trava o login da sonda — usar o
@@ -568,8 +570,8 @@ SOB FALHA (rota interceptada com 500):
   oferece "Tentar de novo": true
 ```
 
-Evidência: [caminho feliz](passo4-inbox-demandas.png) ·
-[sob falha](passo4-inbox-demandas-falha.png).
+Evidência: caminho feliz (captura histórica passo4-inbox-demandas.png) ·
+sob falha (captura histórica passo4-inbox-demandas-falha.png).
 
 ### Sabotagens — previsão antes de rodar
 
@@ -634,8 +636,8 @@ segue sem execução, e isso fica declarado.
 
 O achado da seção anterior virou trabalho. **Em 1280px o painel de CRM não
 existia na tela** — nem cortado, nem parcial: ausente. Ver
-[antes](inbox-antes-1280.png) e
-[depois](inbox-cabe-1280.png), mesma conversa, mesma largura.
+antes (captura histórica inbox-antes-1280.png) e
+depois (captura histórica inbox-cabe-1280.png), mesma conversa, mesma largura.
 
 ### A causa não era onde parecia
 
@@ -728,8 +730,8 @@ parar de repeti-la.
 ```
 
 Contra o antes: `fora` era 311/225/151/55/0 e `thread` era 707 travado.
-[1280px](inbox-cabe-1280.png) ·
-[1920px, o controle de que nada regrediu no largo](inbox-cabe-1920.png).
+1280px (captura histórica inbox-cabe-1280.png) ·
+1920px, o controle de que nada regrediu no largo (captura histórica inbox-cabe-1920.png).
 
 ### Duas camadas de guarda, e a limitação declarada
 
@@ -915,7 +917,7 @@ CICLO: statusPatch          200
        audit                1         ← demanda.proximo_passo_definido
 ```
 
-Evidência: [depois de marcar](passo4-inbox-proximo-passo.png). A confirmação vem
+Evidência: depois de marcar (captura histórica passo4-inbox-proximo-passo.png). A confirmação vem
 do **banco**, não de uma mensagem de sucesso na tela — é assim que o bug conhecido
 de `organizations` engana (PostgREST devolve 200 tendo casado zero linhas).
 

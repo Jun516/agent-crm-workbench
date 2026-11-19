@@ -1,5 +1,7 @@
 # Pi Native CRM — marca
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 ## Símbolo e logotipo
 
 | Arquivo | O que é |
@@ -27,17 +29,17 @@ Prova pela tela (2026-09-08, Supabase local fresco do `baseline.sql`, marca sem 
 
 | Imagem | O que mostra |
 |---|---|
-| `evidence/marca/crm-login-claro.png` | Fachada de entrada com o logotipo, tema claro |
-| `evidence/marca/crm-login-escuro.png` | A mesma fachada no escuro: terracota clara e nome em creme |
-| `evidence/marca/crm-sidebar-aberta.png` | Barra lateral aberta com o logotipo |
-| `evidence/marca/crm-sidebar-aberta-escura.png` | Barra aberta no escuro |
-| `evidence/marca/crm-sidebar-recolhida.png` | Barra recolhida (64px) só com o símbolo |
-| `evidence/marca/crm-sidebar-recolhida-escura.png` | Barra recolhida no escuro |
-| `evidence/marca/favicon-produto.png` | `/icon` gerado em runtime com o símbolo |
-| `evidence/marca/crm-login-revendedor.png` | Controle negativo: com `platform_branding.app_name` gravado, a fachada fica sem o desenho |
-| `evidence/marca/favicon-revendedor.png` | Controle negativo: o favicon volta à inicial sobre a cor de destaque |
-| `evidence/marca/lp-cabecalho.png` | Cabeçalho da página pública com o logotipo |
-| `evidence/marca/lp-rodape.png` | Rodapé da LP com o símbolo |
+| evidence/marca/crm-login-claro.png | Fachada de entrada com o logotipo, tema claro |
+| evidence/marca/crm-login-escuro.png | A mesma fachada no escuro: terracota clara e nome em creme |
+| evidence/marca/crm-sidebar-aberta.png | Barra lateral aberta com o logotipo |
+| evidence/marca/crm-sidebar-aberta-escura.png | Barra aberta no escuro |
+| evidence/marca/crm-sidebar-recolhida.png | Barra recolhida (64px) só com o símbolo |
+| evidence/marca/crm-sidebar-recolhida-escura.png | Barra recolhida no escuro |
+| evidence/marca/favicon-produto.png | `/icon` gerado em runtime com o símbolo |
+| evidence/marca/crm-login-revendedor.png | Controle negativo: com `platform_branding.app_name` gravado, a fachada fica sem o desenho |
+| evidence/marca/favicon-revendedor.png | Controle negativo: o favicon volta à inicial sobre a cor de destaque |
+| evidence/marca/lp-cabecalho.png | Cabeçalho da página pública com o logotipo |
+| evidence/marca/lp-rodape.png | Rodapé da LP com o símbolo |
 
 ## Social preview (Open Graph)
 

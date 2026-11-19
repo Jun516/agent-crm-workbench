@@ -36,6 +36,7 @@ import { describe, expect, it } from "vitest";
 import { allTools } from "@/lib/mcp/tools";
 import { catalogEntry } from "@/lib/mcp/tools/catalog";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
+import { buildEphemeralTokenScopes } from "@/lib/ai/runtime/mcp_token";
 
 const RAIZ = join(__dirname, "..", "..");
 
@@ -191,11 +192,12 @@ describe("catálogo de tools — papel exigido e alcance real do agente", () => 
    * e é o único jeito de a afirmação envelhecer com barulho.
    */
   it("o mint do token efêmero ainda grava o papel que este teste assume", () => {
-    const fonte = readFileSync(join(RAIZ, "lib/ai/runtime/mcp_token.ts"), "utf8");
-    expect(fonte).toContain(`"role:${PAPEL_DO_AGENTE_PUBLICADO}"`);
+    const scopes = buildEphemeralTokenScopes({ runId: "run-fixture" });
+    expect(scopes).toContain(`role:${PAPEL_DO_AGENTE_PUBLICADO}`);
+    expect(scopes).toContain("agent_run:run-fixture");
 
     const runtime = readFileSync(join(RAIZ, "lib/agent-engine/agent/ai-agent-run.ts"), "utf8");
-    expect(runtime).toContain(`\`agent_run:\${run.id}\``);
-    expect(runtime).toContain(`"role:${PAPEL_DO_AGENTE_PUBLICADO}"`);
+    expect(runtime).toMatch(/scopes:\s*buildEphemeralTokenScopes\(\{\s*runId:\s*run\.id\b/);
+    expect(runtime).toContain(`role: "${PAPEL_DO_AGENTE_PUBLICADO}"`);
   });
 });

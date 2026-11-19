@@ -1,5 +1,7 @@
 # 本地三服务真实联调记录（2026-10-03）
 
+> 文件名仅用于标识当时本地验收的历史截图，公开仓库未附带原图。以下保留当时记录的结果。
+
 ## 结论与范围
 
 Mem0、WeKnora Wiki、Langfuse 均已通过真实功能请求接入本地 CRM，不仅是进程健康。测试只使用 `pi-native-demo` 的合成资料和既有加密模型凭据；没有接通客户渠道、发送消息或修改商机。本次不证明生产可用、多 Agent 调度可靠性或业务答案全部正确。
@@ -76,4 +78,4 @@ Docker VM 保持 4GB，没有清空 Supabase 或增加虚拟机内存。观测�
 
 真实 Langfuse 调用树与评分截图：
 
-![本地真实 Trace 与 8 项评分](screenshots/local-langfuse-trace-eval-2026-10-03.png)
+本地真实 Trace 与 8 项评分（历史截图文件 screenshots/local-langfuse-trace-eval-2026-10-03.png）
