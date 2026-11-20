@@ -28,14 +28,12 @@ Sentry.init({
   // ERRO continua, porque é o que explica o stack trace — e o replayIntegration()
   // sem argumentos já aplica maskAllText/blockAllMedia.
   tracesSampleRate: community ? 0 : 1,
-  enableLogs: true,
 
   replaysSessionSampleRate: community ? 0 : 0.1,
   replaysOnErrorSampleRate: 1.0,
 
-  sendDefaultPii: false,
-
   ...sentryScrubHooks,
+  beforeSendSpan: Sentry.withStaticSpan(sentryScrubHooks.beforeSendSpan),
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

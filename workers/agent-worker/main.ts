@@ -47,10 +47,8 @@ Sentry.init({
 
   // No Sentry da comunidade, só erro (issue #100). Ver isCommunityDsn().
   tracesSampleRate: sentryCommunity ? 0 : 1,
-  enableLogs: true,
-  sendDefaultPii: false,
-
   ...sentryScrubHooks,
+  beforeSendSpan: Sentry.withStaticSpan(sentryScrubHooks.beforeSendSpan),
 });
 
 // Transparência de telemetria (mesma mensagem de sentry.server.config.ts,

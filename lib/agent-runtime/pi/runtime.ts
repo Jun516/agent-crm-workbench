@@ -486,17 +486,20 @@ export class PiAgentRuntime implements AgentRuntime {
           ...(decision.terminate !== undefined ? { terminate: decision.terminate } : {}),
         };
       },
-      shouldStopAfterTurn: async ({ message }) => {
+      finishTurn: async ({ message }) => {
+        // Pi 1.3 also calls finishTurn on hard exits. CRM stop policies only
+        // account for completed turns, as they did before the upgrade.
+        if (message.stopReason === "error" || message.stopReason === "aborted") return;
         turns += 1;
-        if (message.role === "assistant") {
-          usage = addUsage(usage, usageOf(message.usage));
-        }
+        usage = addUsage(usage, usageOf(message.usage));
         const converted = messageFromPi(message);
         const requested =
           converted === null
             ? false
             : await input.shouldStopAfterTurn?.({ message: converted, turn: turns, usage });
-        return requested === true || (input.maxTurns !== undefined && turns >= input.maxTurns);
+        if (requested === true || (input.maxTurns !== undefined && turns >= input.maxTurns)) {
+          return { action: "end" };
+        }
       },
     });
 
@@ -531,26 +534,34 @@ export class PiAgentRuntime implements AgentRuntime {
       }
     };
 
+    let eventFailure: { cause: unknown } | undefined;
     agent.subscribe(async (event) => {
-      const mapped = runtimeEvent(event);
-      events.push(mapped);
-      await input.onEvent?.(mapped);
-      if (event.type === "message_end") {
-        const steeringId = steeringMessages.get(event.message);
-        if (steeringId !== undefined) steeringInModelContext.add(steeringId);
-      }
-      if (event.type !== "turn_end" || event.message.role !== "assistant") return;
-      if (!contextProbeAcknowledged && contextProbeSeenInCurrentModelRequest && input.contextProbe &&
-          event.message.stopReason !== "error" && event.message.stopReason !== "aborted") {
-        const consumed: AgentRuntimeEvent = {
-          type: "model_context_consumed", data: { probeId: input.contextProbe.id },
-        };
-        events.push(consumed);
-        await input.onEvent?.(consumed);
-        contextProbeAcknowledged = true;
-      }
-      contextProbeSeenInCurrentModelRequest = false;
-      if (event.message.stopReason !== "error" && event.message.stopReason !== "aborted") {
+      // The runtime awaits subscribers before executing tools and starting the
+      // next model turn. A CRM event can check the workbench lease and must
+      // settle before either of those operations proceeds.
+      if (eventFailure !== undefined) return;
+      try {
+        const mapped = runtimeEvent(event);
+        events.push(mapped);
+        await input.onEvent?.(mapped);
+        if (event.type === "message_end") {
+          const steeringId = steeringMessages.get(event.message);
+          if (steeringId !== undefined) steeringInModelContext.add(steeringId);
+        }
+        if (event.type !== "turn_end" || event.message.role !== "assistant") return;
+
+        const probeReachedModel = contextProbeSeenInCurrentModelRequest;
+        contextProbeSeenInCurrentModelRequest = false;
+        if (event.message.stopReason === "error" || event.message.stopReason === "aborted") return;
+        if (!contextProbeAcknowledged && probeReachedModel && input.contextProbe) {
+          const consumed: AgentRuntimeEvent = {
+            type: "model_context_consumed",
+            data: { probeId: input.contextProbe.id },
+          };
+          events.push(consumed);
+          await input.onEvent?.(consumed);
+          contextProbeAcknowledged = true;
+        }
         for (const steeringId of steeringSentToModel) {
           const consumed: AgentRuntimeEvent = { type: "steering_consumed", data: { steeringId } };
           events.push(consumed);
@@ -558,11 +569,17 @@ export class PiAgentRuntime implements AgentRuntime {
         }
         steeringInModelContext.clear();
         steeringSentToModel.clear();
+        // finishTurn already counted this turn. Pi polls its steering queue
+        // after turn_end settles, unless the run is ending.
+        if (!input.steering || input.abortSignal?.aborted ||
+            (input.maxTurns !== undefined && turns >= input.maxTurns)) return;
+        await queuePendingSteering();
+      } catch (cause) {
+        // Pi turns a listener exception into synthetic failure events. Surface
+        // the original CRM error and do not send more events to that listener.
+        eventFailure = { cause };
+        throw cause;
       }
-      if (!input.steering || event.message.stopReason === "error" ||
-          event.message.stopReason === "aborted" || input.abortSignal?.aborted ||
-          (input.maxTurns !== undefined && turns + 1 >= input.maxTurns)) return;
-      await queuePendingSteering();
     });
 
     const abort = () => agent.abort();
@@ -589,6 +606,7 @@ export class PiAgentRuntime implements AgentRuntime {
       }
     }
 
+    if (eventFailure !== undefined) throw eventFailure.cause;
     const messages = agent.state.messages.flatMap((message) => {
       const converted = messageFromPi(message);
       return converted === null ? [] : [converted];

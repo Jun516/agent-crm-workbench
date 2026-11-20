@@ -12,8 +12,6 @@ Sentry.init({
 
   // No Sentry da comunidade, só erro (issue #100). Ver isCommunityDsn().
   tracesSampleRate: isCommunityDsn(sentryDsn) ? 0 : 1,
-  enableLogs: true,
-  sendDefaultPii: false,
-
   ...sentryScrubHooks,
+  beforeSendSpan: Sentry.withStaticSpan(sentryScrubHooks.beforeSendSpan),
 });

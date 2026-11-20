@@ -22,7 +22,7 @@ Stack canônica (major; a versão exata é o `package.json`):
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript 6 estrito · Tailwind 4 (config em CSS) ·
 shadcn/ui (`new-york`) · Supabase (Postgres + Auth + Realtime + Storage) · Zod 4 · Vitest 4 ·
-Playwright 1 · Sentry 10 · WAHA 2026.7.2 (engine NOWEB) · Upstash Redis · Pi Agent Core + Vercel AI SDK auxiliar
+Playwright 1 · Sentry 11 · WAHA 2026.7.2 (engine NOWEB) · Upstash Redis · Pi Agent Core + Vercel AI SDK auxiliar
 (`@ai-sdk/anthropic|openai|google`).
 
 > As majors acima são verificadas contra o `package.json` por
