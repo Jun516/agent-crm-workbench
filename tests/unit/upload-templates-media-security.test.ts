@@ -35,13 +35,16 @@ describe("Upload de mídia para templates (POST /api/v1/channels/partner/templat
 
     const req = new NextRequest("http://localhost/api/v1/channels/partner/templates/media", {
       method: "POST",
-      body: formData,
     });
+    const readFormData = vi.fn(async () => formData);
+    req.formData = readFormData;
 
     const res = await POST(req);
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.error.code).toBe("forbidden_role");
+    expect(readFormData).not.toHaveBeenCalled();
+    expect(createAdminClient).not.toHaveBeenCalled();
   });
 
   it("recusa arquivo fingindo ser PNG mas contendo SVG ou texto malicioso (spoofing de MIME)", async () => {
