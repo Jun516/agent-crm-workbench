@@ -206,14 +206,15 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
     // dos dois lados.
     const script = `
       const fs = require("node:fs");
-      import("@/lib/ai/rag/extractors/pdf").then(async (m) => {
-        const texto = await m.extractPdfText(fs.readFileSync("tests/fixtures/sample-multipagina.pdf"));
+      const { extractPdfText, estrategiaPadrao } = require("@/lib/ai/rag/extractors/pdf");
+      (async () => {
+        const texto = await extractPdfText(fs.readFileSync("tests/fixtures/sample-multipagina.pdf"));
         process.stdout.write(JSON.stringify({
-          estrategia: m.estrategiaPadrao(),
+          estrategia: estrategiaPadrao(),
           texto,
           heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
         }));
-      }).catch((e) => { console.error(String(e && e.stack || e)); process.exit(1); });
+      })().catch((e) => { console.error(String(e && e.stack || e)); process.exit(1); });
     `;
     const saida = execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "--eval", script], {
       cwd: raiz,
