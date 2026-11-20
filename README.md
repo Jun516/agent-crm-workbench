@@ -131,7 +131,7 @@ CRM 产品层通过自有接口调用运行内核；Pi 类型封装在适配层�
 
 ### 本地开发
 
-准备 Node.js 22+、pnpm，以及开发用 Supabase 和 Redis 配置。
+准备 Node.js 22.19.0 或更新版本、pnpm，以及开发用 Supabase 和 Redis 配置。
 
 ```bash
 git clone https://github.com/Jun516/agent-crm-workbench.git
