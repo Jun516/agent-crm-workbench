@@ -169,7 +169,7 @@ export function ContactDetailClient({ contactId }: Props) {
       </header>
 
       <ConversaNoDossie conversa={contact.conversa} />
-      {activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager && (
+      {activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent && (
         <CustomerMemoryPanel key={contactId} contactId={contactId}
           readOnly={contact.is_anonymized || user.support?.access_mode === "support_readonly"} />
       )}

@@ -210,7 +210,23 @@ export async function runResumedWorkbenchTurn(input: {
     if (SUBMIT_WORKBENCH_RESULT_TOOL in gatedTools)
       throw new Error("workbench_result_tool_name_collision");
     Object.assign(gatedTools, resultChannel.tools);
-    const modelDeps = { pool: getRequestPool(), llmCfg: deps.llmCfg, log: deps.log, runtime: deps.runtime };
+    const modelDeps = {
+      pool: getRequestPool(),
+      llmCfg: deps.llmCfg,
+      log: deps.log,
+      runtime: deps.runtime,
+      ...(input.runtimeState.refinement === undefined && input.scope.contactId
+        ? {
+            customerMemory: {
+              contactId: input.scope.contactId,
+              conversationId: input.scope.conversationId,
+              leadId: input.scope.leadId,
+              task: input.task,
+              beforeRead: input.beforeSideEffect,
+            },
+          }
+        : {}),
+    };
     const contextProbe = input.missionId
       ? await loadMissionDirectionContextProbe(getRequestPool(), {
           organizationId, missionId: input.missionId, runId,

@@ -23,6 +23,9 @@ vi.mock("@/lib/agent-engine/agent/agent-config", () => ({
 }));
 vi.mock("@/lib/agent-engine/agent/request-deps", () => ({ requestTurnDeps: vi.fn() }));
 vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: () => ({}) }));
+vi.mock("@/lib/ai/customer-memory/evaluation", () => ({
+  loadMemoryEvaluationRecalls: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/lib/ai/agents/workbench-observed-evidence", () => ({
   loadWorkbenchObservedEvidence: mocks.evidence,
 }));

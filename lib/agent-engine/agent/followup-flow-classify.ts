@@ -2,7 +2,8 @@
  * Classificador + planejador de tempo do sistema de fluxos de follow-up (onda 5,
  * Task 5.1) — os dois `purpose` de `followup_turn` dirigido por fluxo que NÃO
  * rodam o agente inteiro (`classify`/`plan_timing`): uma ÚNICA chamada de
- * modelo pelo seam agnóstico (runModelCall), mesmo padrão de
+ * modelo pelo gateway canônico; o planejamento aplica o contexto confirmado
+ * por requisição via executePiTurnModelCall. A classificação de intenção usa runModelCall, como
  * stage-classifier.ts/guardrails/promise/semantic.ts.
  *
  * Quem decide o que fazer com o resultado é a PONTE
@@ -18,6 +19,7 @@ import { runModelCall, type LlmEdgeConfig } from '../edge/llm/run-model-call';
 import type { LeadContext } from '../edge/crm/get-lead-context';
 import { fusoDaOrganizacao } from './fuso-da-org';
 import { renderAgora } from '@/lib/tempo/agora';
+import { executePiTurnModelCall } from './pi-turn-execution';
 
 const CLASSIFY_INSTRUCTION =
   'Você é um classificador auxiliar de follow-up (NÃO responde ao lead). Classifique a ' +
@@ -213,12 +215,26 @@ export async function planFollowupTiming(
   cfg: LlmEdgeConfig,
   ids: { tenantId: string; leadId: string; jobId: string },
   args: { context: LeadContext; esperas: EsperaParaPlanejar[]; model?: string },
-  deps: { runtime?: AgentRuntime; log: Logger; clock?: () => Date },
+  deps: { runtime?: AgentRuntime; log: Logger; clock?: () => Date; beforeRead?: () => Promise<void> },
 ): Promise<{ propostas: PropostaDeEsperaBruta[]; modelo: string }> {
+  if (args.context.lead_id !== ids.leadId ||
+      (args.context.contact_id !== undefined && args.context.contact_id !== ids.leadId)) {
+    throw new Error('customer_memory_scope_invalid');
+  }
   const now = (deps.clock ?? ((): Date => new Date()))();
-  const call = await runModelCall(
-    db,
-    cfg,
+  const call = await executePiTurnModelCall(
+    {
+      pool: db,
+      llmCfg: cfg,
+      log: deps.log,
+      ...(deps.runtime ? { runtime: deps.runtime } : {}),
+      customerMemory: {
+        contactId: ids.leadId,
+        conversationId: args.context.conversation_id,
+        task: 'Planejar o próximo contato de follow-up: horários permitidos, preferências e restrições de comunicação.',
+        ...(deps.beforeRead ? { beforeRead: deps.beforeRead } : {}),
+      },
+    },
     {
       tenantId: ids.tenantId,
       leadId: ids.leadId,
@@ -237,7 +253,6 @@ export async function planFollowupTiming(
         },
       ],
     },
-    { log: deps.log, ...(deps.runtime ? { runtime: deps.runtime } : {}) },
   );
   const propostas = parsePlanoDeEsperas(call.result.text, args.esperas.map((e) => e.node_id));
   if (propostas.length === 0) {

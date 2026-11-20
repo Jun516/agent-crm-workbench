@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/hooks/i18n/useT";
 import { sugestaoParaMostrar } from "@/lib/agent-engine/agent/sugestao-de-resposta";
+import { CustomerMemoryUsage } from "@/components/ai/CustomerMemoryUsage";
 type Draft = {
   id: string;
   revision: string;
@@ -180,6 +181,12 @@ export function ReplyReviewPanel({
               </div>
             </>
           )}
+          <CustomerMemoryUsage
+            key={`${draft.id}:${draft.status}`}
+            context="draft"
+            id={draft.id}
+            readOnly={disabled}
+          />
           {draft.status === "failed" && (
             <p className="text-xs">
               {t("Confira a configuração do agente e tente gerar novamente.")}

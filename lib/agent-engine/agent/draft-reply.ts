@@ -14,6 +14,8 @@ import { getLeadContext } from '../edge/crm/get-lead-context';
 import { fusoDaOrganizacao } from './fuso-da-org';
 import type { CrmEdgeConfig } from '../edge/crm/mcp-client';
 import { runModelCall, type LlmEdgeConfig } from '../edge/llm/run-model-call';
+import { createCustomerMemoryCall } from '@/lib/ai/customer-memory/consumption';
+import { createLogger } from '../obs/logger';
 
 export interface DraftReplyInput {
   tenantId: string; // = organization_id
@@ -96,7 +98,7 @@ export async function generateDraftReply(
   // (viraria 500 cru). Retorna 'empty' (a UI mostra um aviso amigável).
   if (messages.length === 0) return { ok: false, reason: 'empty' };
 
-  const { result } = await runModelCall(db, llmCfg, {
+  const memory = createCustomerMemoryCall(db, {
     tenantId: input.tenantId,
     leadId: input.leadId,
     jobId: null,
@@ -107,7 +109,17 @@ export async function generateDraftReply(
     llmOverride: { provider: agent.provider, credentialId: agent.credentialId },
     // SEM tools, SEM maxSteps → o Pi runtime para no 1º turno:
     // result.text vem pronto, sem risco do modelo tentar chamar send_message.
-  });
+  }, { contactId: input.leadId, conversationId: input.conversationId,
+    task: messages.map(message => typeof message.content === 'string' ? message.content : '').join('\n').slice(-2000) });
+  let response: Awaited<ReturnType<typeof runModelCall>>;
+  try {
+    response = await runModelCall(db, llmCfg, memory.input);
+    await memory.finish(response.callId, 'success');
+  } catch (error) {
+    await memory.finish(null, 'error').catch(() => createLogger().error('customer_memory_receipt_failed', {organization_id:input.tenantId}));
+    throw error;
+  }
+  const { result } = response;
 
   const draft = (result.text ?? '').trim();
   if (!draft) return { ok: false, reason: 'empty' };

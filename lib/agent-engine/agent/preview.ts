@@ -35,6 +35,7 @@ export interface TurnPreview {
   onRuntimeMessages?: (messages: RuntimeMessage[]) => void | Promise<void>;
   organizationId: string;
   runId: string;
+  memoryUsage?: { draftId: string; draftGenerationToken: string };
   agent: PublishedAgentConfig;
   context: Extract<LeadContextResult, { ok: true }>;
   previous?: LeadCheckpointRow | null;

@@ -238,6 +238,7 @@ export interface PiAiSdkCallInput {
   runtime?: AgentRuntime;
   transformContext?: AgentTurnInput["transformContext"];
   contextProbe?: AgentTurnInput["contextProbe"];
+  contextProbes?: AgentTurnInput["contextProbes"];
   beforeToolCall?: AgentTurnInput["beforeToolCall"];
   afterToolCall?: AgentTurnInput["afterToolCall"];
   steering?: AgentTurnInput["steering"];
@@ -263,6 +264,7 @@ export async function runPiAiSdkCall(input: PiAiSdkCallInput) {
     abortSignal: input.abortSignal,
     ...(input.transformContext ? { transformContext: input.transformContext } : {}),
     ...(input.contextProbe ? { contextProbe: input.contextProbe } : {}),
+    ...(input.contextProbes ? { contextProbes: input.contextProbes } : {}),
     ...(input.evaluation
       ? {
           beforeToolCall: async (toolCall) => {

@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const mocks = vi.hoisted(() => ({ from: vi.fn(), evaluate: vi.fn(), project: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  from: vi.fn(),
+  evaluate: vi.fn(),
+  project: vi.fn(),
+  memory: vi.fn(),
+}));
+vi.mock("@/lib/ai/customer-memory/evaluation", () => ({
+  loadMemoryEvaluationRecalls: mocks.memory,
+}));
 vi.mock("@/lib/ai/integrations/langfuse", () => ({ projectLangfuseEvaluation: mocks.project }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/auth/require-role", () => ({
@@ -18,7 +26,8 @@ vi.mock("@/lib/ai/evals/semantic-judge", () => ({
 vi.mock("@/lib/ai/evals/run-evaluation", () => ({ runAgentEvaluation: mocks.evaluate }));
 import { GET, POST } from "./route";
 const id = "11111111-1111-4111-8111-111111111111";
-function stub(failure?: string, corruptChild = false, missingState = false) {
+const contact = "a0000000-0000-4000-8000-000000000001";
+function stub(failure?: string, corruptChild = false, missingState = false, scoped = false) {
   mocks.from.mockImplementation((table: string) => {
     let multiple = false;
     let child = false;
@@ -36,6 +45,7 @@ function stub(failure?: string, corruptChild = false, missingState = false) {
                 status: "completed",
                 final_text: "Result",
                 runtime_state: {},
+                ...(scoped ? { scope: { contactId: contact } } : {}),
                 updated_at: "now",
               }
           : table === "ai_agent_run_states"
@@ -44,9 +54,11 @@ function stub(failure?: string, corruptChild = false, missingState = false) {
               : missingState
                 ? null
                 : { messages: [] }
-            : table === "ai_agents"
-              ? { origin: "user" }
-              : [],
+            : table === "contacts"
+              ? [{ id: contact }]
+              : table === "ai_agents"
+                ? { origin: "user" }
+                : [],
     });
     const builder = {
       select: () => builder,
@@ -61,6 +73,9 @@ function stub(failure?: string, corruptChild = false, missingState = false) {
       },
       order: () => builder,
       limit: () => builder,
+      is: () => builder,
+      lte: () => builder,
+      or: () => builder,
       maybeSingle: () => Promise.resolve(response()),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve(response()).then(resolve),
     };
@@ -69,6 +84,7 @@ function stub(failure?: string, corruptChild = false, missingState = false) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.memory.mockResolvedValue([]);
   mocks.evaluate.mockResolvedValue({
     runId: id,
     profileKey: "crm",
@@ -81,6 +97,40 @@ beforeEach(() => {
   mocks.project.mockResolvedValue(undefined);
 });
 describe("real evaluation material is required", () => {
+  it("uses SQL receipts for scoped root and specialist runs and invalidates stale reviews", async () => {
+    stub(undefined, false, false, true);
+    const receipt = { recall_id: "receipt", contact_id: contact, coverage: "complete" };
+    const receipts = [receipt];
+    mocks.memory.mockResolvedValue(receipts);
+    const read = () =>
+      GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
+        params: Promise.resolve({ id }),
+      });
+    const response = await read();
+    expect(response.status).toBe(200);
+    expect(mocks.memory).toHaveBeenCalledWith(undefined, "org", [id, "child"]);
+    expect(mocks.from).not.toHaveBeenCalledWith("ai_customer_memories");
+    expect(mocks.evaluate).toHaveBeenCalledWith({
+      profile: expect.any(Object),
+      run: expect.objectContaining({
+        memoryEvaluationRecalls: receipts,
+        confirmedMemoryExpectations: [],
+      }),
+    });
+    const { data: first } = await response.json();
+    mocks.memory.mockResolvedValue([{ ...receipt, coverage: "partial" }]);
+    const { data: updated } = await (await read()).json();
+    expect(updated.inputFingerprint).not.toBe(first.inputFingerprint);
+  });
+  it("fails visibly when native memory receipts cannot be independently loaded", async () => {
+    stub(undefined, false, false, true);
+    mocks.memory.mockRejectedValue(new Error("SQL unavailable"));
+    const response = await GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
+      params: Promise.resolve({ id }),
+    });
+    expect(response.status).toBe(500);
+    expect(mocks.evaluate).not.toHaveBeenCalled();
+  });
   it("keeps GET read-only and explicitly queues deterministic scores without a judge", async () => {
     stub();
     expect(

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CustomerMemoryCandidates } from "@/components/ai/CustomerMemoryCandidates";
+import { CustomerMemoryUsage } from "@/components/ai/CustomerMemoryUsage";
 import { MissionSendControl } from "./MissionSendControl";
 import { RefinementControls } from "./RefinementControls";
 import { JevEvaluationControls } from "./JevEvaluationControls";
@@ -55,6 +57,7 @@ type Proposal = {
   can_undo?: boolean;
 };
 type Detail = Run & {
+  scope?: Scope | null;
   result_document?: {
     revision: number;
     trust: "model_submitted";
@@ -231,11 +234,13 @@ export function AgentCrmWorkbench({
   modelConfigured,
   canCopy,
   initialLead,
+  readOnly = false,
 }: {
   agents: Agent[];
   modelConfigured: boolean;
   canCopy: boolean;
   initialLead?: { id: string; title: string; pipelineId: string } | null;
+  readOnly?: boolean;
 }) {
   const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
   const [task, setTask] = useState("");
@@ -862,6 +867,23 @@ export function AgentCrmWorkbench({
               <article className="rounded-lg bg-surface p-4 text-sm leading-6 break-words whitespace-pre-wrap">
                 {detail.final_text}
               </article>
+            )}
+            {detail?.scope?.contactId &&
+              ["completed", "partial", "failed", "cancelled"].includes(detail.status) && (
+                <CustomerMemoryUsage
+                  key={`${detail.id}:usage`}
+                  context="workbench"
+                  id={detail.id}
+                  readOnly={readOnly}
+                />
+              )}
+            {detail?.scope?.contactId && ["completed", "partial"].includes(detail.status) && (
+              <CustomerMemoryCandidates
+                key={detail.id}
+                contactId={detail.scope.contactId}
+                runId={detail.id}
+                readOnly={readOnly}
+              />
             )}
             {detail?.error_code && (
               <p className="text-sm text-destructive">运行错误：{detail.error_code}</p>

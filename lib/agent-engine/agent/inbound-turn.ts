@@ -2396,11 +2396,19 @@ async function executarTurnoDoAgente(
     // este corpo inteiro. Escoltar aqui deixaria de fora as chamadas de modelo dos
     // auxiliares (`classifyStage`, `maybeCompact`), que rodam ANTES desta e por
     // isso são as que estouram primeiro.
+    const customerMemory = preview?.kind !== "sandbox" && leadId ? {
+      contactId: leadId,
+      conversationId: input.conversationId,
+      task: effectiveContext.messages.filter(message => message.direction === "inbound").at(-1)?.body ?? "客户沟通与跟进",
+      ...(preview?.memoryUsage ?? {}),
+      beforeRead: guardServiceEffect,
+    } : undefined;
     const turn = await executePiTurnModelCall(
       {
         pool,
         llmCfg: deps.llmCfg,
         log: runLog,
+        ...(customerMemory ? { customerMemory } : {}),
         ...(deps.runtime ? { runtime: deps.runtime } : {}),
       },
       {
@@ -2507,6 +2515,7 @@ async function executarTurnoDoAgente(
         pool,
         llmCfg: deps.llmCfg,
         log: runLog,
+        ...(customerMemory ? { customerMemory } : {}),
         ...(deps.runtime ? { runtime: deps.runtime } : {}),
       },
       {

@@ -80,6 +80,7 @@ export default async function AgentCrmWorkbenchPage({
               : null
           }
           canCopy={roleAtLeast(org.role, "admin")}
+          readOnly={user.support?.access_mode === "support_readonly"}
           agents={(agents ?? []).map((agent) => {
             const definition = BUILTIN_AGENTS.find((item) => item.key === agent.builtin_key);
             return {

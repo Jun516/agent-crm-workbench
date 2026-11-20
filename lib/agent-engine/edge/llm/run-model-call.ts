@@ -245,6 +245,7 @@ export interface RunModelCallInput {
   /** Provider-neutral runtime hooks forwarded through the Pi adapter. */
   transformContext?: AgentTurnInput["transformContext"];
   contextProbe?: AgentTurnInput["contextProbe"];
+  contextProbes?: AgentTurnInput["contextProbes"];
   beforeToolCall?: AgentTurnInput["beforeToolCall"];
   afterToolCall?: AgentTurnInput["afterToolCall"];
   /** CRM policy callback; pricing stays inside this gateway. */
@@ -749,6 +750,7 @@ export async function runModelCall(
       evaluation: runtimeMode === RUNTIME_EVALUATION_MODE,
       ...(input.transformContext ? { transformContext: input.transformContext } : {}),
       ...(input.contextProbe ? { contextProbe: input.contextProbe } : {}),
+      ...(input.contextProbes ? { contextProbes: input.contextProbes } : {}),
       ...(input.beforeToolCall ? { beforeToolCall: input.beforeToolCall } : {}),
       ...(input.afterToolCall ? { afterToolCall: input.afterToolCall } : {}),
       ...(input.steering ? { steering: input.steering } : {}),

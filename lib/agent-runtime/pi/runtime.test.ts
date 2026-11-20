@@ -192,6 +192,43 @@ describe("PiAgentRuntime", () => {
     expect(JSON.stringify(result.events)).not.toContain(direction);
   });
 
+  it("acknowledges only the observed context for each successful transformed request", async () => {
+    const { runtime } = runtimeWithFaux([
+      fauxAssistantMessage(fauxToolCall("lookup", {}), { stopReason: "toolUse" }),
+      fauxAssistantMessage("done"),
+    ]);
+    const consumed: string[] = [];
+    let request = 0;
+    const result = await runtime.run({
+      systemPrompt: "Look up the fixture before answering.",
+      prompt: "check",
+      model,
+      maxTurns: 2,
+      tools: [{
+        name: "lookup",
+        description: "Read fixture",
+        inputSchema: { type: "object", properties: {} },
+        capability: "read",
+        execute: async () => ({ content: "fixture" }),
+      }],
+      transformContext: (messages) => [
+        ...messages,
+        { role: "user", content: `private-context-${++request}` },
+      ],
+      contextProbes: () => {
+        const probe = { id: `request-${request}`, userText: `private-context-${request}` };
+        return [{ id: "absent", userText: "removed-before-model" }, probe, probe];
+      },
+      onEvent: async (event) => {
+        if (event.type === "turn_end") await wait(10);
+        if (event.type === "model_context_consumed") consumed.push(String(event.data.probeId));
+      },
+    });
+    expect(request).toBe(2);
+    expect(consumed).toEqual(["request-1", "request-2"]);
+    expect(JSON.stringify(result.events)).not.toContain("private-context");
+  });
+
   it("does not claim direction consumption after context filtering or a failed turn", async () => {
     const direction = JSON.stringify("先按新的报价依据核对");
     const contextProbe = { id: "manager-direction:mission-1:2", userText: direction };
@@ -208,7 +245,9 @@ describe("PiAgentRuntime", () => {
     const failed = runtimeWithFaux([fauxAssistantMessage("", { stopReason: "error" })]);
     const stopPolicy = vi.fn(() => false);
     const failedResult = await failed.runtime.run({ systemPrompt: "CRM",
-      prompt: `负责人方向：${direction}`, model, contextProbe, shouldStopAfterTurn: stopPolicy });
+      prompt: `负责人方向：${direction}`, model, contextProbe,
+      contextProbes: () => [{ id: "dynamic", userText: direction }],
+      shouldStopAfterTurn: stopPolicy });
     expect(failedResult.events.some((event) => event.type === "model_context_consumed"))
       .toBe(false);
     expect(stopPolicy).not.toHaveBeenCalled();

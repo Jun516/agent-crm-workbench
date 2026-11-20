@@ -364,6 +364,18 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
 
   // ─────────────────────────── Lembrar e buscar ────────────────────────────
   {
+    id: "customer_memory_extract",
+    rotulo: "Sugerir memórias do cliente",
+    oQueFaz:
+      "Extrai hipóteses com trechos da conversa e aponta conflito com dados do CRM; só a pessoa confirma.",
+    papel: "lembrar",
+    exige: { tools: true },
+    emissor: "lib/ai/customer-memory/extraction.ts",
+    sintomaDeFalha:
+      "As sugestões de memória não são geradas; o vendedor pode propor e confirmar pelo painel.",
+    registraEm: "llm_calls",
+  },
+  {
     id: "compaction",
     rotulo: "Resumir a conversa longa",
     oQueFaz:

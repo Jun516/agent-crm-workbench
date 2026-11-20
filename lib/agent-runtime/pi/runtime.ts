@@ -357,8 +357,8 @@ export class PiAgentRuntime implements AgentRuntime {
     const steeringMessages = new Map<AgentMessage, string>();
     const steeringInModelContext = new Set<string>();
     const steeringSentToModel = new Set<string>();
-    let contextProbeSeenInCurrentModelRequest = false;
-    let contextProbeAcknowledged = false;
+    let probesInCurrentRequest: string[] = [];
+    const acknowledgedProbes = new Set<string>();
 
     const tools: AgentTool[] = (input.tools ?? []).map((tool) => {
       const parameters = Type.Unsafe(tool.inputSchema);
@@ -435,10 +435,23 @@ export class PiAgentRuntime implements AgentRuntime {
         // Pi calls convertToLlm after transformContext and immediately before
         // constructing the provider request. The transcript alone is weaker:
         // a future context transform may remove the manager's instruction.
-        const probe = input.contextProbe;
-        contextProbeSeenInCurrentModelRequest = probe !== undefined &&
-          modelMessages.some((message) => message.role === "user" &&
-            textOf(message.content).includes(probe.userText));
+        const dynamicProbes = input.contextProbes?.(
+          modelMessages.flatMap((message) => {
+            const converted = messageFromPi(message);
+            return converted === null ? [] : [converted];
+          }),
+        ) ?? [];
+        if (dynamicProbes.length > 64 || dynamicProbes.some(({ id, userText }) =>
+          !id.trim() || id.length > 200 || !userText.trim() || userText.length > 20_000
+        )) throw new Error("pi_context_probe_invalid");
+        const probes = input.contextProbe ? [input.contextProbe, ...dynamicProbes] : dynamicProbes;
+        probesInCurrentRequest = probes
+          .filter(({ userText }) =>
+            modelMessages.some((message) =>
+              message.role === "user" && textOf(message.content).includes(userText),
+            ),
+          )
+          .map(({ id }) => id);
         // transformContext may remove a direction after Pi appended it to its
         // transcript. A message_end event alone is not proof it reached the LLM.
         for (const steeringId of steeringInModelContext) {
@@ -550,17 +563,18 @@ export class PiAgentRuntime implements AgentRuntime {
         }
         if (event.type !== "turn_end" || event.message.role !== "assistant") return;
 
-        const probeReachedModel = contextProbeSeenInCurrentModelRequest;
-        contextProbeSeenInCurrentModelRequest = false;
+        const probesForTurn = probesInCurrentRequest;
+        probesInCurrentRequest = [];
         if (event.message.stopReason === "error" || event.message.stopReason === "aborted") return;
-        if (!contextProbeAcknowledged && probeReachedModel && input.contextProbe) {
+        for (const probeId of probesForTurn) {
+          if (acknowledgedProbes.has(probeId)) continue;
           const consumed: AgentRuntimeEvent = {
             type: "model_context_consumed",
-            data: { probeId: input.contextProbe.id },
+            data: { probeId },
           };
           events.push(consumed);
           await input.onEvent?.(consumed);
-          contextProbeAcknowledged = true;
+          acknowledgedProbes.add(probeId);
         }
         for (const steeringId of steeringSentToModel) {
           const consumed: AgentRuntimeEvent = { type: "steering_consumed", data: { steeringId } };

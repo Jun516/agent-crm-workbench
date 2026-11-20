@@ -11,6 +11,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { loadAgentVersionConfig } from "@/lib/agent-engine/agent/agent-config";
 import { requestTurnDeps } from "@/lib/agent-engine/agent/request-deps";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
+import { loadMemoryEvaluationRecalls } from "@/lib/ai/customer-memory/evaluation";
 import { BUILTIN_AGENTS } from "@/lib/ai/agents/builtins";
 import { parseRuntimeMessages } from "@/lib/ai/agents/workbench-state";
 import type { AgentEvalReport, AgentEvalRunInput } from "@/lib/ai/evals/contracts";
@@ -179,9 +180,11 @@ async function loadEvaluationMaterial(
     ...(parsedRootMessages ?? []),
     ...(childStates ?? []).flatMap((child) => parseRuntimeMessages(child.messages) ?? []),
   ];
+  const scope = z.object({ contactId: z.uuid().nullish() }).safeParse(run.scope);
   const contactIds = [
-    ...new Set(
-      runtimeMessages.flatMap((message) => {
+    ...new Set([
+      ...(scope.success && scope.data.contactId ? [scope.data.contactId] : []),
+      ...runtimeMessages.flatMap((message) => {
         if (message.role !== "tool" || message.toolName !== "crm_get_contact" || message.isError)
           return [];
         try {
@@ -200,24 +203,46 @@ async function loadEvaluationMaterial(
           return [];
         }
       }),
-    ),
+    ]),
   ];
   if (contactIds.length > 50)
     throw new EvaluationMaterialError("read_failed", "记忆覆盖校验超出安全读取上限。");
   let confirmedMemoryExpectations: AgentEvalRunInput["confirmedMemoryExpectations"] = [];
+  let memoryEvaluationRecalls: NonNullable<AgentEvalRunInput["memoryEvaluationRecalls"]> = [];
+  let observedContactIds = contactIds;
   if (contactIds.length) {
+    try {
+      memoryEvaluationRecalls = await loadMemoryEvaluationRecalls(
+        getRequestPool(),
+        organizationId,
+        [run.id, ...(collaborationRuns ?? []).map((child) => child.id)],
+      );
+    } catch {
+      throw new EvaluationMaterialError("read_failed", "无法独立核对记忆读取回执。");
+    }
+    observedContactIds = [
+      ...new Set([...contactIds, ...memoryEvaluationRecalls.map((receipt) => receipt.contact_id)]),
+    ];
+    if (observedContactIds.length > 50)
+      throw new EvaluationMaterialError("read_failed", "记忆覆盖校验超出安全读取上限。");
     // Only facts present throughout this run count. Later additions/deletions
     // cannot manufacture a historical failure. Current privacy always wins.
     const contacts = await admin
       .from("contacts")
       .select("id")
       .eq("organization_id", organizationId)
-      .in("id", contactIds)
+      .in("id", observedContactIds)
       .eq("is_anonymized", false)
       .is("is_merged_into", null);
     if (contacts.error)
       throw new EvaluationMaterialError("read_failed", "无法独立校验客户记忆作用域。");
-    const allowed = (contacts.data ?? []).map((contact) => contact.id);
+    const currentContacts = new Set((contacts.data ?? []).map((contact) => contact.id));
+    memoryEvaluationRecalls = memoryEvaluationRecalls.filter((receipt) =>
+      currentContacts.has(receipt.contact_id),
+    );
+    const recalledContacts = new Set(memoryEvaluationRecalls.map((receipt) => receipt.contact_id));
+    const observed = new Set(contactIds);
+    const allowed = [...currentContacts].filter((id) => observed.has(id) && !recalledContacts.has(id));
     if (allowed.length) {
       const memories = await admin
         .from("ai_customer_memories")
@@ -276,6 +301,7 @@ async function loadEvaluationMaterial(
     })),
     runtimeMessages,
     confirmedMemoryExpectations,
+    memoryEvaluationRecalls,
     collaborationRuns: (collaborationRuns ?? []).map((child) => ({
       id: child.id,
       specialistKey: child.specialist_key,
@@ -301,6 +327,7 @@ async function loadEvaluationMaterial(
         collaborationRuns,
         runtimeMessages,
         confirmedMemoryExpectations,
+        ...(memoryEvaluationRecalls.length ? { memoryEvaluationRecalls } : {}),
         profile: { key: profile.key, revision: profile.revision },
       }),
     )
@@ -315,7 +342,7 @@ async function loadEvaluationMaterial(
     baseFingerprint,
     versionId: typeof runtimeState.versionId === "string" ? runtimeState.versionId : null,
     scope: run.scope,
-    observedContactIds: contactIds,
+    observedContactIds,
   };
 }
 

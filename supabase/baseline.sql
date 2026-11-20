@@ -7602,7 +7602,7 @@ alter table job_queue add constraint job_queue_kind_check
   -- antigos rodam antes e falham em cadeia. Vigiado por
   -- tests/unit/baseline-constraint-reconstruida.test.ts.
   -- 'transactional_delivery' (0226) segue a mesma consolidação de vocabulário.
-  check (kind in ('inbound_turn','followup_turn','watchdog','flywheel','case_reply_turn','operator_turn','transactional_delivery','approved_reply','workbench_start','workbench_resume','internal_im_event','internal_im_question'));
+  check (kind in ('inbound_turn','followup_turn','watchdog','flywheel','case_reply_turn','operator_turn','transactional_delivery','approved_reply','workbench_start','workbench_resume','internal_im_event','internal_im_question','customer_memory_extract','customer_memory_consolidate'));
 alter table job_queue drop constraint if exists job_queue_turn_needs_contact;
 do $$
 declare c text;
@@ -7613,7 +7613,7 @@ begin
   if c is not null then execute format('alter table job_queue drop constraint %I', c); end if;
 end $$;
 alter table job_queue add constraint job_queue_turn_needs_contact
-  check ((kind in ('inbound_turn','followup_turn','case_reply_turn','operator_turn','transactional_delivery','approved_reply')) = (contact_id is not null));
+  check ((kind in ('inbound_turn','followup_turn','case_reply_turn','operator_turn','transactional_delivery','approved_reply','customer_memory_extract','customer_memory_consolidate')) = (contact_id is not null));
 
 alter table cron_jobs drop constraint if exists cron_jobs_job_kind_check;
 alter table cron_jobs add constraint cron_jobs_job_kind_check
@@ -37903,6 +37903,412 @@ comment on function public.fn_colunas_de_cliente_sao_do_sistema() is
 -- duas origens (o grant a PUBLIC e o grant direto a `anon` do baseline) não
 -- quebra nada.
 revoke execute on function public.fn_colunas_de_cliente_sao_do_sistema() from public, anon, authenticated;
+
+-- ---- Customer memory lifecycle and hypotheses (migration 0409) ----
+-- Issue 28: L1 remains the only confirmed truth. L2 is service-owned and never a model fact.
+alter table public.ai_customer_memories
+  add column if not exists memory_type text not null default 'relationship_context',
+  add column if not exists attribute_key text,
+  add column if not exists attribute_value text,
+  add column if not exists risk_level text not null default 'high',
+  add column if not exists retention_policy text not null default 'durable',
+  add column if not exists ttl_expires_at timestamptz,
+  add column if not exists review_due_at timestamptz,
+  add column if not exists locked boolean not null default false,
+  add column if not exists needs_review boolean not null default false,
+  add column if not exists review_reason text,
+  add column if not exists supersedes uuid,
+  add column if not exists confirmed_at timestamptz,
+  add column if not exists policy_revision integer not null default 1,
+  add column if not exists policy_hash text,
+  add column if not exists evidence_conversation_id uuid;
+update public.ai_customer_memories set confirmed_at=created_at where confirmed_at is null;
+alter table public.ai_customer_memories alter column confirmed_at set default now();
+alter table public.ai_customer_memories alter column confirmed_at set not null;
+create unique index if not exists ai_customer_memories_id_org_contact_idx on public.ai_customer_memories(id,organization_id,contact_id);
+create unique index if not exists conversations_memory_evidence_scope_idx on public.conversations(id,organization_id,contact_id);
+create unique index if not exists messages_memory_evidence_scope_idx on public.messages(id,organization_id,contact_id,conversation_id);
+alter table public.ai_customer_memories drop constraint if exists ai_customer_memory_policy_check;
+alter table public.ai_customer_memories add constraint ai_customer_memory_policy_check check (
+  memory_type in ('constraint','commercial_preference','communication_preference','temporary_request','relationship_context')
+  and risk_level in ('medium','high') and policy_revision>0
+  and retention_policy in ('durable','ephemeral')
+  and (retention_policy<>'ephemeral' or ttl_expires_at is not null)
+  and (retention_policy<>'durable' or ttl_expires_at is null)
+  and (memory_type<>'temporary_request' or retention_policy='ephemeral')
+  and (not locked or retention_policy='durable')
+  and ((attribute_key is null and attribute_value is null) or (attribute_key is not null and attribute_value is not null))
+  and (attribute_key is null or (attribute_key ~ '^[a-z][a-z0-9_.-]{0,119}$' and attribute_key !~ '^(order|contract|stage|amount|owner)([_.-]|$)'))
+  and (attribute_value is null or char_length(attribute_value)<=300)
+  and (policy_hash is null or policy_hash ~ '^[a-f0-9]{64}$')
+  and (supersedes is null or supersedes<>id)
+);
+alter table public.ai_customer_memories drop constraint if exists ai_customer_memory_supersedes_fk;
+alter table public.ai_customer_memories add constraint ai_customer_memory_supersedes_fk
+  foreign key(supersedes,organization_id,contact_id) references public.ai_customer_memories(id,organization_id,contact_id);
+alter table public.ai_customer_memories drop constraint if exists ai_customer_memory_evidence_fk;
+alter table public.ai_customer_memories add constraint ai_customer_memory_evidence_fk
+  foreign key(evidence_conversation_id,organization_id,contact_id) references public.conversations(id,organization_id,contact_id) on delete set null (evidence_conversation_id);
+create index if not exists ai_customer_memory_locked_idx on public.ai_customer_memories(organization_id,contact_id) where locked and deleted_at is null;
+create index if not exists ai_customer_memory_expiry_idx on public.ai_customer_memories(ttl_expires_at) where deleted_at is null and retention_policy='ephemeral';
+
+create table if not exists public.ai_customer_memory_candidates (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contact_id uuid not null,
+  request_key uuid not null,
+  category text not null check(category in ('preference','confirmed_fact','communication_context')),
+  memory_type text not null check(memory_type in ('constraint','commercial_preference','communication_preference','temporary_request','relationship_context')),
+  body text not null check(char_length(body)<=2000),
+  attribute_key text check(attribute_key ~ '^[a-z][a-z0-9_.-]{0,119}$' and attribute_key !~ '^(order|contract|stage|amount|owner)([_.-]|$)'),
+  attribute_value text check(char_length(attribute_value)<=300),
+  risk_level text not null check(risk_level in ('medium','high')),
+  ttl_expires_at timestamptz,
+  model_confidence numeric check(model_confidence between 0 and 1),
+  normalized_hash text not null check(normalized_hash ~ '^[a-f0-9]{64}$'),
+  source_kind text not null check(source_kind in ('explicit','conversation_close','checkpoint','workbench_complete')),
+  source_run_id uuid,
+  proposed_by uuid references auth.users(id) on delete set null,
+  status text not null default 'pending' check(status in ('pending','confirmed','rejected','merged')),
+  confirmed_memory_id uuid,
+  merged_into uuid,
+  decision_reason text check(char_length(decision_reason)<=1000),
+  decided_by uuid references auth.users(id) on delete set null,
+  decided_at timestamptz,
+  rejected_until timestamptz,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(organization_id,request_key), unique(id,organization_id,contact_id),
+  foreign key(contact_id,organization_id) references public.contacts(id,organization_id) on delete cascade,
+  foreign key(source_run_id,organization_id) references public.ai_workbench_runs(id,organization_id) on delete cascade,
+  foreign key(confirmed_memory_id,organization_id,contact_id) references public.ai_customer_memories(id,organization_id,contact_id),
+  foreign key(merged_into,organization_id,contact_id) references public.ai_customer_memory_candidates(id,organization_id,contact_id),
+  check((attribute_key is null)=(attribute_value is null)),
+  check(memory_type<>'temporary_request' or ttl_expires_at is not null),
+  check(merged_into is null or merged_into<>id),
+  check(status<>'confirmed' or confirmed_memory_id is not null),
+  check(deleted_at is not null or status<>'rejected' or (decision_reason is not null and decided_at is not null and rejected_until is not null)),
+  check(status<>'merged' or merged_into is not null)
+);
+create unique index if not exists ai_customer_candidate_pending_hash_idx on public.ai_customer_memory_candidates(organization_id,contact_id,normalized_hash) where status='pending' and deleted_at is null;
+create index if not exists ai_customer_candidate_queue_idx on public.ai_customer_memory_candidates(organization_id,contact_id,status,created_at);
+create table if not exists public.ai_customer_memory_evidence (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contact_id uuid not null,
+  candidate_id uuid not null,
+  conversation_id uuid,
+  message_id uuid,
+  excerpt text not null check(char_length(excerpt)<=2000),
+  observed_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  foreign key(candidate_id,organization_id,contact_id) references public.ai_customer_memory_candidates(id,organization_id,contact_id) on delete cascade,
+  foreign key(conversation_id,organization_id,contact_id) references public.conversations(id,organization_id,contact_id) on delete cascade,
+  foreign key(message_id,organization_id,contact_id,conversation_id) references public.messages(id,organization_id,contact_id,conversation_id) on delete cascade,
+  check(message_id is null or conversation_id is not null)
+);
+create unique index if not exists ai_customer_evidence_dedup_idx on public.ai_customer_memory_evidence(candidate_id,message_id,md5(excerpt)) where message_id is not null;
+create unique index if not exists crm_leads_memory_scope_idx on public.crm_leads(id,organization_id,contact_id);
+create table if not exists public.ai_customer_memory_conflicts (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contact_id uuid not null,
+  memory_id uuid not null,
+  other_memory_id uuid,
+  candidate_id uuid,
+  business_lead_id uuid,
+  conflict_key text not null,
+  kind text not null check(kind in ('l0_l1','l1_l1','l2_l1')),
+  status text not null default 'open' check(status in ('open','resolved')),
+  resolution text check(char_length(resolution)<=1000),
+  resolved_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  unique(organization_id,contact_id,conflict_key),
+  foreign key(contact_id,organization_id) references public.contacts(id,organization_id) on delete cascade,
+  foreign key(memory_id,organization_id,contact_id) references public.ai_customer_memories(id,organization_id,contact_id),
+  foreign key(other_memory_id,organization_id,contact_id) references public.ai_customer_memories(id,organization_id,contact_id),
+  foreign key(candidate_id,organization_id,contact_id) references public.ai_customer_memory_candidates(id,organization_id,contact_id) on delete cascade,
+  foreign key(business_lead_id,organization_id,contact_id) references public.crm_leads(id,organization_id,contact_id) on delete set null (business_lead_id)
+);
+create table if not exists public.ai_customer_memory_usage (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contact_id uuid not null,
+  run_id uuid not null,
+  memory_id uuid not null,
+  memory_revision text not null,
+  policy_revision integer not null,
+  used_at timestamptz not null default now(),
+  corrected_at timestamptz,
+  corrected_by uuid references auth.users(id) on delete set null,
+  correction_reason text check(char_length(correction_reason)<=1000),
+  primary key(organization_id,run_id,memory_id),
+  foreign key(contact_id,organization_id) references public.contacts(id,organization_id) on delete cascade,
+  foreign key(run_id,organization_id) references public.ai_workbench_runs(id,organization_id) on delete cascade,
+  foreign key(memory_id,organization_id,contact_id) references public.ai_customer_memories(id,organization_id,contact_id)
+);
+-- SQL pools are trusted backend only. Browser roles cannot read L1 or hypotheses directly.
+alter table public.ai_customer_memory_candidates enable row level security;
+alter table public.ai_customer_memory_evidence enable row level security;
+alter table public.ai_customer_memory_conflicts enable row level security;
+alter table public.ai_customer_memory_usage enable row level security;
+revoke all on public.ai_customer_memory_candidates,public.ai_customer_memory_evidence,public.ai_customer_memory_conflicts,public.ai_customer_memory_usage from public,anon,authenticated;
+grant select,insert,update,delete on public.ai_customer_memory_candidates,public.ai_customer_memory_evidence,public.ai_customer_memory_conflicts,public.ai_customer_memory_usage to service_role;
+
+-- Separate privacy trigger preserves the existing Mem0 cleanup/reconciliation protocol unchanged.
+create or replace function public.fn_ai_memory_candidate_privacy() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+  if TG_OP='DELETE' then
+    -- Confirmed rows survive as content-free remote-cleanup receipts. Optional
+    -- references must not retain a contact FK that blocks that tombstone.
+    delete from public.ai_customer_memory_usage where organization_id=old.organization_id and contact_id=old.id;
+    delete from public.ai_customer_memory_conflicts where organization_id=old.organization_id and contact_id=old.id;
+    delete from public.ai_customer_memory_candidates where organization_id=old.organization_id and contact_id=old.id;
+    update public.ai_customer_memories set evidence_conversation_id=null,attribute_key=null,attribute_value=null,review_reason=null
+      where organization_id=old.organization_id and contact_id=old.id;
+    return old;
+  end if;
+  if new.is_anonymized is true or new.is_merged_into is not null then
+    update public.ai_customer_memory_evidence set excerpt='',message_id=null,conversation_id=null
+      where organization_id=new.organization_id and contact_id=new.id;
+    update public.ai_customer_memory_candidates set body='',attribute_key=null,attribute_value=null,decision_reason=null,
+      deleted_at=coalesce(deleted_at,now()),updated_at=now()
+      where organization_id=new.organization_id and contact_id=new.id;
+    update public.ai_customer_memory_conflicts set resolution=null where organization_id=new.organization_id and contact_id=new.id;
+    update public.ai_customer_memory_usage set correction_reason=null where organization_id=new.organization_id and contact_id=new.id;
+    update public.ai_customer_memories set attribute_key=null,attribute_value=null,review_reason=null,evidence_conversation_id=null
+      where organization_id=new.organization_id and contact_id=new.id;
+  end if;
+  return new;
+end $$;
+revoke all on function public.fn_ai_memory_candidate_privacy() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_candidate_privacy on public.contacts;
+create trigger trg_ai_memory_candidate_privacy before update of is_anonymized,is_merged_into or delete on public.contacts
+  for each row execute function public.fn_ai_memory_candidate_privacy();
+notify pgrst,'reload schema';
+
+-- ---- Customer memory event producers and nightly maintenance (migration 0410) ----
+-- Issue 28: local, durable extraction/maintenance. No optional integration is required.
+-- job_queue vocabulary is consolidated in the single earlier constraint block.
+create unique index if not exists orders_memory_scope_idx on public.orders(id,organization_id,contact_id);
+alter table public.ai_customer_memory_conflicts add column if not exists business_order_id uuid;
+alter table public.ai_customer_memory_conflicts add column if not exists business_fingerprint text;
+alter table public.ai_customer_memory_conflicts add column if not exists business_field text;
+alter table public.ai_customer_memory_conflicts drop constraint if exists ai_memory_conflict_order_fk;
+alter table public.ai_customer_memory_conflicts add constraint ai_memory_conflict_order_fk
+ foreign key(business_order_id,organization_id,contact_id) references public.orders(id,organization_id,contact_id) on delete set null (business_order_id);
+
+-- Reassigning a business source must not move a customer's conflict into another contact.
+create or replace function public.fn_ai_memory_business_detach() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+ if new.contact_id is distinct from old.contact_id or new.organization_id is distinct from old.organization_id then
+  if TG_TABLE_NAME='crm_leads' then
+   update public.ai_customer_memory_conflicts set business_lead_id=null,status='resolved',resolved_at=now(),resolution='business_source_scope_changed'
+    where organization_id=old.organization_id and contact_id=old.contact_id and business_lead_id=old.id;
+  else
+   update public.ai_customer_memory_conflicts set business_order_id=null,status='resolved',resolved_at=now(),resolution='business_source_scope_changed'
+    where organization_id=old.organization_id and contact_id=old.contact_id and business_order_id=old.id;
+  end if;
+ end if;
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_business_detach() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_lead_detach on public.crm_leads;
+create trigger trg_ai_memory_lead_detach before update of contact_id,organization_id on public.crm_leads for each row execute function public.fn_ai_memory_business_detach();
+drop trigger if exists trg_ai_memory_order_detach on public.orders;
+create trigger trg_ai_memory_order_detach before update of contact_id,organization_id on public.orders for each row execute function public.fn_ai_memory_business_detach();
+
+create or replace function public.fn_ai_memory_schedule_night(p_org uuid,p_contact uuid,p_after timestamptz default now()) returns uuid
+language plpgsql security definer set search_path=public,extensions as $$
+declare tz text; due timestamptz; event_id uuid;
+begin
+ select o.timezone into tz from public.organizations o join public.contacts c on c.organization_id=o.id
+  where o.id=p_org and c.id=p_contact and not c.is_anonymized and c.is_merged_into is null;
+ if not found then return null; end if;
+ if not exists(select 1 from pg_timezone_names where name=tz) then tz:='America/Sao_Paulo'; end if;
+ due:=(((p_after at time zone tz)::date+1)+time '02:00') at time zone tz;
+ event_id:=extensions.uuid_generate_v5('7d9db30a-0409-5410-8410-000000000001'::uuid,
+  'memory-night:'||p_org::text||':'||p_contact::text||':'||(due at time zone tz)::date::text);
+ insert into public.event_log(id,organization_id,event_type,entity_kind,entity_id,payload,next_attempt_at)
+  values(event_id,p_org,'customer_memory.consolidate','contact',p_contact,
+   jsonb_build_object('contact_id',p_contact,'run_after',due),due) on conflict(id) do nothing;
+ return event_id;
+end $$;
+revoke all on function public.fn_ai_memory_schedule_night(uuid,uuid,timestamptz) from public,anon,authenticated;
+grant execute on function public.fn_ai_memory_schedule_night(uuid,uuid,timestamptz) to service_role;
+
+create or replace function public.fn_ai_memory_emit_extract(p_org uuid,p_contact uuid,p_source text,
+ p_conversation uuid,p_revision bigint,p_until timestamptz,p_run uuid default null,p_not_before timestamptz default now(),p_key text default null) returns uuid
+language plpgsql security definer set search_path=public,extensions as $$
+declare event_id uuid;
+begin
+ if p_source not in ('conversation_close','checkpoint','workbench_complete','business_change','maintenance_review') then raise exception 'memory_source_invalid'; end if;
+ if not exists(select 1 from public.contacts where organization_id=p_org and id=p_contact and not is_anonymized and is_merged_into is null) then return null; end if;
+ if p_conversation is not null and not exists(select 1 from public.conversations where organization_id=p_org and contact_id=p_contact and id=p_conversation) then raise exception 'memory_source_scope_invalid'; end if;
+ if p_run is not null and not exists(select 1 from public.ai_workbench_runs where organization_id=p_org and id=p_run and scope->>'contactId'=p_contact::text) then raise exception 'memory_source_scope_invalid'; end if;
+ if p_until is null or (p_conversation is not null and p_revision is null) then raise exception 'memory_source_boundary_missing'; end if;
+ event_id:=extensions.uuid_generate_v5('7d9db30a-0409-5410-8410-000000000002'::uuid,
+  concat_ws(':','memory-extract',p_org,p_contact,p_source,p_conversation,p_revision,p_run,coalesce(p_key,to_char(p_until at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US'))));
+ insert into public.event_log(id,organization_id,event_type,entity_kind,entity_id,payload,next_attempt_at)
+  values(event_id,p_org,'customer_memory.extract','contact',p_contact,
+   jsonb_build_object('contact_id',p_contact,'source_kind',p_source,'conversation_id',p_conversation,
+    'service_revision',p_revision,'until_at',p_until,'source_run_id',p_run,'run_after',p_not_before),p_not_before)
+  on conflict(id) do nothing;
+ return event_id;
+end $$;
+revoke all on function public.fn_ai_memory_emit_extract(uuid,uuid,text,uuid,bigint,timestamptz,uuid,timestamptz,text) from public,anon,authenticated;
+grant execute on function public.fn_ai_memory_emit_extract(uuid,uuid,text,uuid,bigint,timestamptz,uuid,timestamptz,text) to service_role;
+
+create or replace function public.fn_ai_memory_close_extract() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+ if not new.is_group and new.status in ('closed','resolved','archived') and old.status is distinct from new.status then
+  perform public.fn_ai_memory_emit_extract(new.organization_id,new.contact_id,'conversation_close',new.id,old.service_revision,clock_timestamp());
+ end if;
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_close_extract() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_close_extract on public.conversations;
+create trigger trg_ai_memory_close_extract after update of status on public.conversations for each row execute function public.fn_ai_memory_close_extract();
+
+create or replace function public.fn_ai_memory_checkpoint_extract() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare n bigint; prior_objections jsonb;
+begin
+ if new.conversation_id is null or new.service_revision is null then return new; end if;
+ select count(*) into n from public.lead_checkpoints where organization_id=new.organization_id and contact_id=new.contact_id
+  and conversation_id=new.conversation_id and service_revision=new.service_revision and seq<=new.seq;
+ select objections into prior_objections from public.lead_checkpoints where organization_id=new.organization_id and contact_id=new.contact_id
+  and conversation_id=new.conversation_id and service_revision=new.service_revision and seq<new.seq order by seq desc limit 1;
+ if (n%5=0 and new.rolling_summary<>'') or (new.objections<>'[]'::jsonb and new.objections is distinct from coalesce(prior_objections,'[]'::jsonb)) then
+  perform public.fn_ai_memory_emit_extract(new.organization_id,new.contact_id,'checkpoint',new.conversation_id,new.service_revision,new.created_at,null,now()+interval '5 minutes');
+ end if;
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_checkpoint_extract() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_checkpoint_extract on public.lead_checkpoints;
+create trigger trg_ai_memory_checkpoint_extract after insert on public.lead_checkpoints for each row execute function public.fn_ai_memory_checkpoint_extract();
+
+create or replace function public.fn_ai_memory_task_extract() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare cid uuid; conv uuid; rev bigint;
+begin
+ if new.parent_run_id is not null or new.status not in ('completed','partial') or old.status is not distinct from new.status then return new; end if;
+ if coalesce(new.scope->>'contactId','') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then return new; end if;
+ cid:=(new.scope->>'contactId')::uuid;
+ select id,service_revision into conv,rev from public.conversations where organization_id=new.organization_id and contact_id=cid and not is_group
+  and (coalesce(new.scope->>'conversationId','')='' or id::text=new.scope->>'conversationId') order by last_message_at desc nulls last,id limit 1;
+ perform public.fn_ai_memory_emit_extract(new.organization_id,cid,'workbench_complete',conv,rev,clock_timestamp(),new.id);
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_task_extract() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_task_extract on public.ai_workbench_runs;
+create trigger trg_ai_memory_task_extract after update of status on public.ai_workbench_runs for each row execute function public.fn_ai_memory_task_extract();
+
+create or replace function public.fn_ai_memory_business_extract() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+ if new.contact_id is null then return new; end if;
+ if not exists(select 1 from public.ai_customer_memories where organization_id=new.organization_id and contact_id=new.contact_id
+  and deleted_at is null and (ttl_expires_at is null or ttl_expires_at>now())) then return new; end if;
+ if TG_TABLE_NAME='crm_leads' then
+  if row(new.stage_id,new.status,new.value_cents,new.currency,new.owner_user_id) is not distinct from row(old.stage_id,old.status,old.value_cents,old.currency,old.owner_user_id) then return new; end if;
+ else
+  if row(new.status,new.total_cents,new.currency,new.payment_method) is not distinct from row(old.status,old.total_cents,old.currency,old.payment_method) then return new; end if;
+ end if;
+ perform public.fn_ai_memory_emit_extract(new.organization_id,new.contact_id,'business_change',null,null,clock_timestamp());
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_business_extract() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_lead_extract on public.crm_leads;
+create trigger trg_ai_memory_lead_extract after update of stage_id,status,value_cents,currency,owner_user_id on public.crm_leads for each row execute function public.fn_ai_memory_business_extract();
+drop trigger if exists trg_ai_memory_order_extract on public.orders;
+create trigger trg_ai_memory_order_extract after update of status,total_cents,currency,payment_method on public.orders for each row execute function public.fn_ai_memory_business_extract();
+
+create or replace function public.fn_ai_memory_changed_schedule() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+ if new.contact_id is not null then perform public.fn_ai_memory_schedule_night(new.organization_id,new.contact_id); end if;
+ return new;
+end $$;
+revoke all on function public.fn_ai_memory_changed_schedule() from public,anon,authenticated;
+drop trigger if exists trg_ai_memory_changed_schedule on public.ai_customer_memories;
+create trigger trg_ai_memory_changed_schedule after insert or update on public.ai_customer_memories for each row execute function public.fn_ai_memory_changed_schedule();
+drop trigger if exists trg_ai_candidate_changed_schedule on public.ai_customer_memory_candidates;
+create trigger trg_ai_candidate_changed_schedule after insert or update on public.ai_customer_memory_candidates for each row execute function public.fn_ai_memory_changed_schedule();
+-- Existing installations enter maintenance too; identity per tenant/contact/local date deduplicates reapplication.
+select public.fn_ai_memory_schedule_night(organization_id,contact_id) from (
+ select distinct organization_id,contact_id from public.ai_customer_memories where contact_id is not null and deleted_at is null
+ union select distinct organization_id,contact_id from public.ai_customer_memory_candidates where deleted_at is null and status='pending'
+) subjects;
+notify pgrst,'reload schema';
+
+-- ---- Customer memory consumption receipts (migration 0411) ----
+-- Issue 28: consumption receipts cover workbench, conversational turns and drafts.
+-- No prompt/body copies: the SQL memory remains the only customer-fact authority.
+create unique index if not exists job_queue_memory_receipt_scope_idx on public.job_queue(id,organization_id);
+create unique index if not exists llm_calls_memory_receipt_scope_idx on public.llm_calls(id,organization_id);
+create unique index if not exists ai_reply_drafts_memory_scope_idx on public.ai_reply_drafts(id,organization_id,contact_id);
+create table if not exists public.ai_customer_memory_recalls (
+ id uuid primary key,
+ organization_id uuid not null references public.organizations(id) on delete cascade,
+ contact_id uuid not null,
+ run_id uuid,
+ conversation_id uuid,
+ draft_id uuid,
+ draft_generation_token uuid,
+ job_id uuid,
+ call_id uuid,
+ purpose text not null,
+ call_outcome text not null check(call_outcome in ('success','error')),
+ status text not null,
+ provider_status text not null,
+ coverage text not null check(coverage in ('complete','partial','unavailable')),
+ returned_count integer not null check(returned_count between 0 and 32),
+ business_coverage text not null check(business_coverage in ('complete','partial','unavailable')),
+ injected_at timestamptz not null,
+ consumed_at timestamptz not null default now(),
+ unique(id,organization_id,contact_id),
+ foreign key(contact_id,organization_id) references public.contacts(id,organization_id) on delete cascade,
+ foreign key(run_id,organization_id) references public.ai_workbench_runs(id,organization_id) on delete cascade,
+ foreign key(conversation_id,organization_id,contact_id) references public.conversations(id,organization_id,contact_id) on delete cascade,
+ foreign key(draft_id,organization_id,contact_id) references public.ai_reply_drafts(id,organization_id,contact_id) on delete cascade,
+ foreign key(job_id,organization_id) references public.job_queue(id,organization_id) on delete set null(job_id),
+ foreign key(call_id,organization_id) references public.llm_calls(id,organization_id) on delete set null(call_id),
+ check(run_id is not null or conversation_id is not null),
+ check(draft_id is null or conversation_id is not null),
+ check(run_id is null or draft_id is null)
+);
+alter table public.ai_customer_memory_recalls enable row level security;
+revoke all on public.ai_customer_memory_recalls from public,anon,authenticated;
+grant select,insert,update,delete on public.ai_customer_memory_recalls to service_role;
+create index if not exists ai_customer_memory_recalls_run_idx on public.ai_customer_memory_recalls(organization_id,run_id,consumed_at desc);
+create index if not exists ai_customer_memory_recalls_draft_idx on public.ai_customer_memory_recalls(organization_id,draft_id,consumed_at desc);
+create index if not exists ai_customer_memory_recalls_conversation_idx on public.ai_customer_memory_recalls(organization_id,conversation_id,consumed_at desc);
+
+alter table public.ai_customer_memory_usage
+ add column if not exists id uuid not null default gen_random_uuid(),
+ add column if not exists recall_id uuid,
+ add column if not exists memory_type text,
+ add column if not exists risk_level text,
+ add column if not exists locked boolean,
+ add column if not exists needs_review boolean,
+ add column if not exists confirmed_by uuid references auth.users(id) on delete set null,
+ add column if not exists confirmed_at timestamptz;
+alter table public.ai_customer_memory_usage drop constraint if exists ai_customer_memory_usage_pkey;
+alter table public.ai_customer_memory_usage alter column run_id drop not null;
+alter table public.ai_customer_memory_usage add primary key(id);
+alter table public.ai_customer_memory_usage drop constraint if exists ai_customer_memory_usage_recall_fk;
+alter table public.ai_customer_memory_usage add constraint ai_customer_memory_usage_recall_fk
+ foreign key(recall_id,organization_id,contact_id) references public.ai_customer_memory_recalls(id,organization_id,contact_id) on delete cascade;
+alter table public.ai_customer_memory_usage drop constraint if exists ai_customer_memory_usage_context_check;
+alter table public.ai_customer_memory_usage add constraint ai_customer_memory_usage_context_check check(run_id is not null or recall_id is not null);
+create unique index if not exists ai_customer_memory_usage_request_idx on public.ai_customer_memory_usage(organization_id,recall_id,memory_id) where recall_id is not null;
+create unique index if not exists ai_customer_memory_usage_legacy_idx on public.ai_customer_memory_usage(organization_id,run_id,memory_id) where recall_id is null;
+notify pgrst,'reload schema';
 
 -- ---- VARREDURA anon: fecha os apêndices posteriores à migration 0116 ----
 -- O bloco original 0116 precede as migrations acrescentadas ao baseline ao

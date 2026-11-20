@@ -28,6 +28,516 @@ export type Database = {
   };
   public: {
     Tables: {
+      ai_customer_memory_recalls: {
+        Row: {
+          business_coverage: string;
+          call_id: string | null;
+          call_outcome: string;
+          consumed_at: string;
+          contact_id: string;
+          conversation_id: string | null;
+          coverage: string;
+          draft_generation_token: string | null;
+          draft_id: string | null;
+          id: string;
+          injected_at: string;
+          job_id: string | null;
+          organization_id: string;
+          provider_status: string;
+          purpose: string;
+          returned_count: number;
+          run_id: string | null;
+          status: string;
+        };
+        Insert: {
+          business_coverage: string;
+          call_id?: string | null;
+          call_outcome: string;
+          consumed_at?: string;
+          contact_id: string;
+          conversation_id?: string | null;
+          coverage: string;
+          draft_generation_token?: string | null;
+          draft_id?: string | null;
+          id: string;
+          injected_at: string;
+          job_id?: string | null;
+          organization_id: string;
+          provider_status: string;
+          purpose: string;
+          returned_count: number;
+          run_id?: string | null;
+          status: string;
+        };
+        Update: {
+          business_coverage?: string;
+          call_id?: string | null;
+          call_outcome?: string;
+          consumed_at?: string;
+          contact_id?: string;
+          conversation_id?: string | null;
+          coverage?: string;
+          draft_generation_token?: string | null;
+          draft_id?: string | null;
+          id?: string;
+          injected_at?: string;
+          job_id?: string | null;
+          organization_id?: string;
+          provider_status?: string;
+          purpose?: string;
+          returned_count?: number;
+          run_id?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memory_recalls_call_id_organization_id_fkey";
+            columns: ["call_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "llm_calls";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_contact_id_organization_id_fkey";
+            columns: ["contact_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_conversation_id_organization_id_fkey";
+            columns: ["conversation_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_draft_id_organization_id_contac_fkey";
+            columns: ["draft_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_reply_drafts";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_job_id_organization_id_fkey";
+            columns: ["job_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "job_queue";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_recalls_run_id_organization_id_fkey";
+            columns: ["run_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_workbench_runs";
+            referencedColumns: ["id", "organization_id"];
+          },
+        ];
+      };
+      ai_customer_memory_candidates: {
+        Row: {
+          attribute_key: string | null;
+          attribute_value: string | null;
+          body: string;
+          category: string;
+          confirmed_memory_id: string | null;
+          contact_id: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_reason: string | null;
+          deleted_at: string | null;
+          id: string;
+          memory_type: string;
+          merged_into: string | null;
+          model_confidence: number | null;
+          normalized_hash: string;
+          organization_id: string;
+          proposed_by: string | null;
+          rejected_until: string | null;
+          request_key: string;
+          risk_level: string;
+          source_kind: string;
+          source_run_id: string | null;
+          status: string;
+          ttl_expires_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          attribute_key?: string | null;
+          attribute_value?: string | null;
+          body: string;
+          category: string;
+          confirmed_memory_id?: string | null;
+          contact_id: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          memory_type: string;
+          merged_into?: string | null;
+          model_confidence?: number | null;
+          normalized_hash: string;
+          organization_id: string;
+          proposed_by?: string | null;
+          rejected_until?: string | null;
+          request_key: string;
+          risk_level: string;
+          source_kind: string;
+          source_run_id?: string | null;
+          status?: string;
+          ttl_expires_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          attribute_key?: string | null;
+          attribute_value?: string | null;
+          body?: string;
+          category?: string;
+          confirmed_memory_id?: string | null;
+          contact_id?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          memory_type?: string;
+          merged_into?: string | null;
+          model_confidence?: number | null;
+          normalized_hash?: string;
+          organization_id?: string;
+          proposed_by?: string | null;
+          rejected_until?: string | null;
+          request_key?: string;
+          risk_level?: string;
+          source_kind?: string;
+          source_run_id?: string | null;
+          status?: string;
+          ttl_expires_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memory_candidates_confirmed_memory_id_organiza_fkey";
+            columns: ["confirmed_memory_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memories";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_candidates_contact_id_organization_id_fkey";
+            columns: ["contact_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_candidates_merged_into_organization_id__fkey";
+            columns: ["merged_into", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memory_candidates";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_candidates_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_candidates_source_run_id_organization_i_fkey";
+            columns: ["source_run_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_workbench_runs";
+            referencedColumns: ["id", "organization_id"];
+          },
+        ];
+      };
+      ai_customer_memory_evidence: {
+        Row: {
+          candidate_id: string;
+          contact_id: string;
+          conversation_id: string | null;
+          created_at: string;
+          excerpt: string;
+          id: string;
+          message_id: string | null;
+          observed_at: string;
+          organization_id: string;
+        };
+        Insert: {
+          candidate_id: string;
+          contact_id: string;
+          conversation_id?: string | null;
+          created_at?: string;
+          excerpt: string;
+          id?: string;
+          message_id?: string | null;
+          observed_at: string;
+          organization_id: string;
+        };
+        Update: {
+          candidate_id?: string;
+          contact_id?: string;
+          conversation_id?: string | null;
+          created_at?: string;
+          excerpt?: string;
+          id?: string;
+          message_id?: string | null;
+          observed_at?: string;
+          organization_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memory_evidence_candidate_id_organization_id_c_fkey";
+            columns: ["candidate_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memory_candidates";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_evidence_conversation_id_organization_i_fkey";
+            columns: ["conversation_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_evidence_message_id_organization_id_con_fkey";
+            columns: ["message_id", "organization_id", "contact_id", "conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "messages";
+            referencedColumns: ["id", "organization_id", "contact_id", "conversation_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_evidence_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_customer_memory_conflicts: {
+        Row: {
+          business_field: string | null;
+          business_fingerprint: string | null;
+          business_lead_id: string | null;
+          business_order_id: string | null;
+          candidate_id: string | null;
+          conflict_key: string;
+          contact_id: string;
+          created_at: string;
+          id: string;
+          kind: string;
+          memory_id: string;
+          organization_id: string;
+          other_memory_id: string | null;
+          resolution: string | null;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          status: string;
+        };
+        Insert: {
+          business_field?: string | null;
+          business_fingerprint?: string | null;
+          business_lead_id?: string | null;
+          business_order_id?: string | null;
+          candidate_id?: string | null;
+          conflict_key: string;
+          contact_id: string;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          memory_id: string;
+          organization_id: string;
+          other_memory_id?: string | null;
+          resolution?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: string;
+        };
+        Update: {
+          business_field?: string | null;
+          business_fingerprint?: string | null;
+          business_lead_id?: string | null;
+          business_order_id?: string | null;
+          candidate_id?: string | null;
+          conflict_key?: string;
+          contact_id?: string;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          memory_id?: string;
+          organization_id?: string;
+          other_memory_id?: string | null;
+          resolution?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_business_lead_id_organization_fkey";
+            columns: ["business_lead_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "crm_leads";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_candidate_id_organization_id__fkey";
+            columns: ["candidate_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memory_candidates";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_contact_id_organization_id_fkey";
+            columns: ["contact_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_memory_id_organization_id_con_fkey";
+            columns: ["memory_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memories";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_conflicts_other_memory_id_organization__fkey";
+            columns: ["other_memory_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memories";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_memory_conflict_order_fk";
+            columns: ["business_order_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+        ];
+      };
+      ai_customer_memory_usage: {
+        Row: {
+          confirmed_at: string | null;
+          confirmed_by: string | null;
+          contact_id: string;
+          corrected_at: string | null;
+          corrected_by: string | null;
+          correction_reason: string | null;
+          id: string;
+          locked: boolean | null;
+          memory_id: string;
+          memory_revision: string;
+          memory_type: string | null;
+          needs_review: boolean | null;
+          organization_id: string;
+          policy_revision: number;
+          recall_id: string | null;
+          risk_level: string | null;
+          run_id: string | null;
+          used_at: string;
+        };
+        Insert: {
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          contact_id: string;
+          corrected_at?: string | null;
+          corrected_by?: string | null;
+          correction_reason?: string | null;
+          id?: string;
+          locked?: boolean | null;
+          memory_id: string;
+          memory_revision: string;
+          memory_type?: string | null;
+          needs_review?: boolean | null;
+          organization_id: string;
+          policy_revision: number;
+          recall_id?: string | null;
+          risk_level?: string | null;
+          run_id?: string | null;
+          used_at?: string;
+        };
+        Update: {
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          contact_id?: string;
+          corrected_at?: string | null;
+          corrected_by?: string | null;
+          correction_reason?: string | null;
+          id?: string;
+          locked?: boolean | null;
+          memory_id?: string;
+          memory_revision?: string;
+          memory_type?: string | null;
+          needs_review?: boolean | null;
+          organization_id?: string;
+          policy_revision?: number;
+          recall_id?: string | null;
+          risk_level?: string | null;
+          run_id?: string | null;
+          used_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memory_usage_contact_id_organization_id_fkey";
+            columns: ["contact_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_usage_memory_id_organization_id_contact_fkey";
+            columns: ["memory_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memories";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_usage_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_usage_recall_fk";
+            columns: ["recall_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memory_recalls";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_usage_run_id_organization_id_fkey";
+            columns: ["run_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_workbench_runs";
+            referencedColumns: ["id", "organization_id"];
+          },
+        ];
+      };
       ai_integration_settings: {
         Row: {
           organization_id: string;
@@ -55,63 +565,137 @@ export type Database = {
 
       ai_customer_memories: {
         Row: {
-          id: string;
-          organization_id: string;
-          contact_id: string | null;
-          subject_key: string;
-          request_key: string;
-          category: string;
+          attribute_key: string | null;
+          attribute_value: string | null;
           body: string;
-          content_hash: string;
+          category: string;
+          confirmed_at: string;
           confirmed_by: string | null;
-          sync_state: string;
-          external_id: string | null;
-          write_started_at: string | null;
-          write_outcome: string;
-          deleted_at: string | null;
-          remote_deleted_at: string | null;
+          contact_id: string | null;
+          content_hash: string;
           created_at: string;
+          deleted_at: string | null;
+          evidence_conversation_id: string | null;
+          external_id: string | null;
+          id: string;
+          locked: boolean;
+          memory_type: string;
+          needs_review: boolean;
+          organization_id: string;
+          policy_hash: string | null;
+          policy_revision: number;
+          remote_deleted_at: string | null;
+          request_key: string;
+          retention_policy: string;
+          review_due_at: string | null;
+          review_reason: string | null;
+          risk_level: string;
+          subject_key: string;
+          supersedes: string | null;
+          sync_state: string;
+          ttl_expires_at: string | null;
           updated_at: string;
+          write_outcome: string;
+          write_started_at: string | null;
         };
         Insert: {
-          id?: string;
-          organization_id: string;
-          contact_id?: string | null;
-          subject_key: string;
-          request_key: string;
-          category: string;
+          attribute_key?: string | null;
+          attribute_value?: string | null;
           body: string;
-          content_hash: string;
+          category: string;
+          confirmed_at?: string;
           confirmed_by?: string | null;
-          sync_state?: string;
-          external_id?: string | null;
-          write_started_at?: string | null;
-          write_outcome?: string;
-          deleted_at?: string | null;
-          remote_deleted_at?: string | null;
+          contact_id?: string | null;
+          content_hash: string;
           created_at?: string;
+          deleted_at?: string | null;
+          evidence_conversation_id?: string | null;
+          external_id?: string | null;
+          id?: string;
+          locked?: boolean;
+          memory_type?: string;
+          needs_review?: boolean;
+          organization_id: string;
+          policy_hash?: string | null;
+          policy_revision?: number;
+          remote_deleted_at?: string | null;
+          request_key: string;
+          retention_policy?: string;
+          review_due_at?: string | null;
+          review_reason?: string | null;
+          risk_level?: string;
+          subject_key: string;
+          supersedes?: string | null;
+          sync_state?: string;
+          ttl_expires_at?: string | null;
           updated_at?: string;
+          write_outcome?: string;
+          write_started_at?: string | null;
         };
         Update: {
-          id?: string;
-          organization_id?: string;
-          contact_id?: string | null;
-          subject_key?: string;
-          request_key?: string;
-          category?: string;
+          attribute_key?: string | null;
+          attribute_value?: string | null;
           body?: string;
-          content_hash?: string;
+          category?: string;
+          confirmed_at?: string;
           confirmed_by?: string | null;
-          sync_state?: string;
-          external_id?: string | null;
-          write_started_at?: string | null;
-          write_outcome?: string;
-          deleted_at?: string | null;
-          remote_deleted_at?: string | null;
+          contact_id?: string | null;
+          content_hash?: string;
           created_at?: string;
+          deleted_at?: string | null;
+          evidence_conversation_id?: string | null;
+          external_id?: string | null;
+          id?: string;
+          locked?: boolean;
+          memory_type?: string;
+          needs_review?: boolean;
+          organization_id?: string;
+          policy_hash?: string | null;
+          policy_revision?: number;
+          remote_deleted_at?: string | null;
+          request_key?: string;
+          retention_policy?: string;
+          review_due_at?: string | null;
+          review_reason?: string | null;
+          risk_level?: string;
+          subject_key?: string;
+          supersedes?: string | null;
+          sync_state?: string;
+          ttl_expires_at?: string | null;
           updated_at?: string;
+          write_outcome?: string;
+          write_started_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "ai_customer_memories_contact_id_organization_id_fkey";
+            columns: ["contact_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memories_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_evidence_fk";
+            columns: ["evidence_conversation_id", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+          {
+            foreignKeyName: "ai_customer_memory_supersedes_fk";
+            columns: ["supersedes", "organization_id", "contact_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_customer_memories";
+            referencedColumns: ["id", "organization_id", "contact_id"];
+          },
+        ];
       };
 
       ai_wiki_evidence: {

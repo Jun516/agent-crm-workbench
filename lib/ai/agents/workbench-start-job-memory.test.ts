@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
   collaboration: vi.fn(),
   selectPlan: vi.fn(),
+  scope: vi.fn(),
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/agent-engine/agent/pi-turn-execution", () => ({
@@ -34,12 +35,7 @@ vi.mock("@/lib/agent-engine/edge/crm/mcp-tools", () => ({
   buildMcpTurnTools: async () => ({ tools: {}, cleanup: vi.fn() }),
 }));
 vi.mock("@/lib/ai/agents/workbench-scope", () => ({
-  resolveWorkbenchScope: async () => ({
-    contactId: null,
-    leadId: null,
-    conversationId: null,
-    pipelineId: null,
-  }),
+  resolveWorkbenchScope: mocks.scope,
 }));
 vi.mock("@/lib/ai/agents/collaboration", () => ({
   selectCollaborationPlan: mocks.selectPlan,
@@ -72,6 +68,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.selectPlan.mockReturnValue(null);
   mocks.collaboration.mockResolvedValue(null);
+  mocks.scope.mockResolvedValue({
+    contactId: null,
+    leadId: null,
+    conversationId: null,
+    pipelineId: null,
+  });
   mocks.model.mockRejectedValue(new Error("stop_after_model_input"));
   mocks.query.mockImplementation(async (sql: string) => ({
     rows: sql.includes("from org_memory_pointers") ? [policyRow] : [],
@@ -112,6 +114,7 @@ describe("Workbench initial organization memory", () => {
       "stop_after_model_input",
     );
     expect(mocks.model).toHaveBeenCalledOnce();
+    expect(mocks.model.mock.calls[0]![0]).not.toHaveProperty("customerMemory");
     const input = mocks.model.mock.calls[0]![1];
     expect(input.system).toContain("CRM playbook\n\n=== memória da organização");
     expect(input.system).toContain(policyRow.content);
@@ -132,17 +135,27 @@ describe("Workbench initial organization memory", () => {
   });
 
   it("passes the same policy-bearing configuration to specialists and retains it in their system prompt", async () => {
+    const scope = { contactId: "contact", leadId: "lead", conversationId: "conversation", pipelineId: null };
+    mocks.scope.mockResolvedValue(scope);
     mocks.selectPlan.mockReturnValue({ key: "test-plan" });
     await expect(runWorkbenchStartJob(job, pool, "worker1")).rejects.toThrow(
       "stop_after_model_input",
     );
     expect(mocks.collaboration).toHaveBeenCalledWith(
       expect.objectContaining({
+        customerMemoryBeforeRead: expect.any(Function),
         agentConfig: expect.objectContaining({
           systemPrompt: expect.stringContaining(policyRow.content),
         }),
       }),
     );
+    expect(mocks.model.mock.calls[0]![0]).toHaveProperty("customerMemory", {
+      contactId: scope.contactId,
+      conversationId: scope.conversationId,
+      leadId: scope.leadId,
+      task: "Check CRM",
+      beforeRead: expect.any(Function),
+    });
     const specialist = readFileSync("lib/ai/agents/workbench-collaboration.ts", "utf8");
     expect(specialist).toMatch(/system:\s*\[\s*(?:\/\/[^\n]*\n\s*)*childConfig\.systemPrompt/);
   });

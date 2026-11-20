@@ -1,3 +1,5 @@
+import { runCustomerMemoryConsolidation } from "@/lib/ai/customer-memory/consolidation";
+import { runCustomerMemoryExtraction } from "@/lib/ai/customer-memory/extraction";
 import { createApprovedReplyHandler } from "@/lib/agent-engine/agent/approved-reply";
 import { turnKnobsFromEnv } from "@/lib/agent-engine/agent/turn-knobs";
 import { createMeetDeliveryHandler } from "@/lib/agent-engine/agent/meet-delivery";
@@ -752,6 +754,12 @@ export async function main(): Promise<void> {
   );
   handlers.set("internal_im_event", (job, pool) => runFeishuInboxJob(job, pool));
   handlers.set("internal_im_question", (job, pool) => runFeishuQuestionJob(job, pool));
+  handlers.set("customer_memory_extract", (job, pool, { workerId }) =>
+    runCustomerMemoryExtraction(pool, turnDeps.llmCfg, job, workerId),
+  );
+  handlers.set("customer_memory_consolidate", (job, pool, { workerId }) =>
+    runCustomerMemoryConsolidation(pool, job, workerId),
+  );
   await startWorker(env, handlers, log);
 }
 

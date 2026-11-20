@@ -332,6 +332,7 @@ export async function runWorkbenchStartJob(
             budget,
           },
           agentConfig: modelAgentConfig,
+          customerMemoryBeforeRead: beforeSideEffect,
           signal: abortController.signal,
         })
       : null);
@@ -460,7 +461,23 @@ ${renderRefinementLessons(refinement.state.lessonCodes)}`;
       });
       return;
     }
-    const modelDeps = { pool: getRequestPool(), llmCfg: deps.llmCfg, log: deps.log, runtime: deps.runtime };
+    const modelDeps = {
+      pool: getRequestPool(),
+      llmCfg: deps.llmCfg,
+      log: deps.log,
+      runtime: deps.runtime,
+      ...(!refinementOptions && scope.contactId
+        ? {
+            customerMemory: {
+              contactId: scope.contactId,
+              conversationId: scope.conversationId,
+              leadId: scope.leadId,
+              task: run.task,
+              beforeRead: beforeSideEffect,
+            },
+          }
+        : {}),
+    };
     const contextProbe = run.mission_id
       ? await loadMissionDirectionContextProbe(pool, {
           organizationId: job.organization_id, missionId: run.mission_id, runId,

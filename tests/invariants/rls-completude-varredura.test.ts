@@ -75,6 +75,11 @@ interface Excecao {
  * linhas da OUTRA organização, não uma leitura como superusuário.
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
+  { tabela: "ai_customer_memory_candidates", razao: "tests/invariants/customer-memory-lifecycle.test.ts — seeded rows in both tenants, positive service-role SQL, actual authenticated queries denied for both users and anon." },
+  { tabela: "ai_customer_memory_evidence", razao: "tests/invariants/customer-memory-lifecycle.test.ts — seeded rows in both tenants, positive service-role SQL, actual authenticated queries denied for both users and anon." },
+  { tabela: "ai_customer_memory_conflicts", razao: "tests/invariants/customer-memory-lifecycle.test.ts — seeded rows in both tenants, positive service-role SQL, actual authenticated queries denied for both users and anon." },
+  { tabela: "ai_customer_memory_usage", razao: "tests/invariants/customer-memory-lifecycle.test.ts — seeded rows in both tenants, positive service-role SQL, actual authenticated queries denied for both users and anon." },
+  { tabela: "ai_customer_memory_recalls", razao: "tests/invariants/customer-memory-consumption.test.ts — real populated consumption receipts; authenticated/anon SQL reads denied and service-role positive control." },
   { tabela: "ai_customer_memories", razao: "tests/invariants/ai-browser-boundaries.test.ts — actual SQL as both authenticated tenants and anon, with service-role positive control; integration settings have positive own-tenant and negative cross-tenant rows." },
   { tabela: "ai_internal_event_inbox", razao: "tests/invariants/ai-browser-boundaries.test.ts — actual SQL as both authenticated tenants and anon, with service-role positive control; integration settings have positive own-tenant and negative cross-tenant rows." },
   { tabela: "ai_internal_identity_challenges", razao: "tests/invariants/ai-browser-boundaries.test.ts — actual SQL as both authenticated tenants and anon, with service-role positive control; integration settings have positive own-tenant and negative cross-tenant rows." },

@@ -3,6 +3,7 @@ import { workbenchToolEffect } from "@/lib/ai/agents/tool-effects";
 import { inspectProductFinalAnswer } from "@/lib/ai/agents/final-answer";
 import { workbenchResultDocumentSchema } from "@/lib/ai/agents/workbench-result-submission";
 import { auditWorkbenchEvidenceProvenance } from "@/lib/ai/evals/evidence-provenance";
+import { evaluateMemoryRecallPolicy, memoryPolicyFailure } from "./memory-policy";
 import type {
   AgentEvalDimensionKey,
   AgentEvalDimensionResult,
@@ -97,14 +98,23 @@ function evaluateAnswerQuality(input: AgentEvalRunInput, label: string): AgentEv
     return result("answer_quality", label, "not_run", [
       { code: "answer_unavailable", message: "尚无可评测的最终答案。" },
     ]);
-  const findings: AgentEvalFinding[] = [];
+  const findings = evaluateMemoryRecallPolicy(input.memoryEvaluationRecalls ?? []);
   for (const expected of input.confirmedMemoryExpectations ?? []) {
+    if (input.memoryEvaluationRecalls?.some((receipt) => receipt.contact_id === expected.contactId))
+      continue;
     const observations = input.runtimeMessages
       .filter(message => message.role === "tool" && message.toolName === "crm_get_contact" && !message.isError)
       .map(parseStructuredToolResult)
       .filter((value): value is Record<string, unknown> => !!value && typeof value === "object" &&
         (value as Record<string, unknown>).id === expected.contactId);
-    if (!observations.length) continue;
+    if (!observations.length) {
+      if (expected.memoryIds.length)
+        findings.push({
+          code: "confirmed_memory_consumption_unproven",
+          message: "SQL 中存在确认记忆，但没有可核验的读取观察或使用回执。",
+        });
+      continue;
+    }
     const reads = observations.map(value => value.confirmed_customer_memory as
       { coverage?: string; memories?: Array<{ id?: string }> } | undefined);
     const observed = new Set(reads.flatMap(read => Array.isArray(read?.memories) ? read.memories.map(m => m.id) : []));
@@ -193,7 +203,8 @@ function evaluateAnswerQuality(input: AgentEvalRunInput, label: string): AgentEv
         finding.code === "answer_likely_truncated" ||
         finding.code === "structured_result_unobserved_evidence" ||
         finding.code === "structured_fact_assertion_mismatch" ||
-        finding.code === "confirmed_memory_not_observed",
+        finding.code === "confirmed_memory_not_observed" ||
+        memoryPolicyFailure(finding.code),
     )
   )
     return result("answer_quality", label, "fail", findings);

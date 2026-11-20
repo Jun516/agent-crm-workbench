@@ -1,3 +1,4 @@
+import { customerMemoryQueueHandler } from "@/lib/ai/customer-memory/jobs";
 import { mem0SyncHandler } from "@/lib/ai/integrations/mem0";
 import { langfuseExportHandler } from "@/lib/ai/integrations/langfuse";
 import { followupGatilhoPresencaHandler } from "@/lib/followup/gatilho-presenca.handler";
@@ -32,6 +33,7 @@ export function ensureHandlersRegistered(): void {
   // Follow-up de inbound ANTES do LLM: no Hobby o drain da mensagem
   // estourava no worker de IA e o match_reply nunca lia a resposta.
   registerHandler(followupReactivityHandler);
+  registerHandler(customerMemoryQueueHandler);
   registerHandler(aiResponseHandler);
   registerHandler(aiSentimentHandler);
   registerHandler(aiHandoffFromSentimentHandler);
