@@ -1085,6 +1085,8 @@ jobs:
       # Esta spec também usa o provider real da organização de demonstração
       # para validar submissão estruturada e assertivas de campos do CRM; o CI
       # compartilhado não deve chamá-lo nem gastar credenciais externas.
+      # customer-memory-loop usa a pilha local WAHA e Redis e o usuário
+      # criado pelo bootstrap do cenário especializado de memória.
       FORA_DO_CI: >-
         inbox-tempo-real.spec.ts
         cadastro-sem-confirmacao-de-email.spec.ts
@@ -1094,6 +1096,7 @@ jobs:
         agent-multi-agent-eval-real-model.spec.ts
         agent-semantic-judge-real-model.spec.ts
         agent-workbench-structured-result-real-model.spec.ts
+        customer-memory-loop.spec.ts
     steps:
       # ── O RELÓGIO DESTA PARTE: ONDE O TETO DE 30 MIN COMEÇA A CONTAR ──────
       #
