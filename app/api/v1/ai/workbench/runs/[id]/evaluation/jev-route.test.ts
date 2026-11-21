@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type { MemoryEvaluationRecall } from "@/lib/ai/evals/contracts";
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   jev: vi.fn(),
   llmBinding: vi.fn(),
   project: vi.fn(),
   evidence: vi.fn(),
+  recalls: vi.fn(),
 }));
 vi.mock("@/lib/ai/jev/client", () => ({
   evaluateJevChoices: mocks.jev,
@@ -24,7 +26,7 @@ vi.mock("@/lib/agent-engine/agent/agent-config", () => ({
 vi.mock("@/lib/agent-engine/agent/request-deps", () => ({ requestTurnDeps: vi.fn() }));
 vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: () => ({}) }));
 vi.mock("@/lib/ai/customer-memory/evaluation", () => ({
-  loadMemoryEvaluationRecalls: vi.fn().mockResolvedValue([]),
+  loadMemoryEvaluationRecalls: mocks.recalls,
 }));
 vi.mock("@/lib/ai/agents/workbench-observed-evidence", () => ({
   loadWorkbenchObservedEvidence: mocks.evidence,
@@ -50,6 +52,14 @@ const wikiMessage = () => ({
   toolName: "crm_search_knowledge",
   content: JSON.stringify({ evidence: [wiki] }),
 });
+const approvedWiki = {
+  id: "wiki",
+  namespace: "organization_wiki",
+  revision: "rev1",
+  title: "Allowed source",
+  excerpt: "CURRENT_APPROVED_CANARY",
+  index_status: "current",
+};
 type Stored = { report: unknown; input_fingerprint: string; organization_id: string };
 const stored = new Map<string, Stored>();
 function db() {
@@ -147,6 +157,7 @@ beforeEach(() => {
   contactEligible = true;
   messages = [];
   mocks.evidence.mockReset().mockResolvedValue([]);
+  mocks.recalls.mockReset().mockResolvedValue([]);
   vi.stubEnv("TYPESAFE_API_KEY", "SERVER_SECRET_CANARY");
   vi.stubEnv("JEV_MODEL", "jev-1.2.3");
   vi.stubEnv("AI_INTEGRATION_BINDINGS", "");
@@ -206,6 +217,21 @@ describe("explicit Jev evaluation route", () => {
     expect((await post()).status).toBe(409);
     expect(mocks.jev).not.toHaveBeenCalled();
   });
+  it("rejects contact revocation during the final knowledge lookup before any Jev request", async () => {
+    scope = { contactId };
+    messages = [wikiMessage()];
+    mocks.evidence.mockResolvedValueOnce([approvedWiki]).mockImplementationOnce(async () => {
+      await Promise.resolve();
+      contactEligible = false;
+      return [approvedWiki];
+    });
+    const response = await post();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "jev_scope_unavailable" } });
+    expect(mocks.evidence).toHaveBeenCalledTimes(2);
+    expect(mocks.jev).not.toHaveBeenCalled();
+    expect(stored.size).toBe(0);
+  });
   it("omits revoked historical knowledge and forces human review", async () => {
     messages = [wikiMessage()];
     const body = await (await post()).json();
@@ -232,6 +258,94 @@ describe("explicit Jev evaluation route", () => {
     expect((await post()).status).toBe(409);
     expect(mocks.evidence).toHaveBeenCalledTimes(2);
     expect(mocks.jev).not.toHaveBeenCalled();
+  });
+  it("does not return a matching pinned cache hit after knowledge authorization changes", async () => {
+    messages = [wikiMessage()];
+    mocks.evidence.mockResolvedValue([approvedWiki]);
+    expect((await post()).status).toBe(200);
+    expect(stored.size).toBe(1);
+    mocks.jev.mockClear();
+    mocks.evidence.mockClear().mockResolvedValueOnce([approvedWiki]).mockResolvedValueOnce([]);
+
+    const response = await post();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "jev_scope_unavailable" } });
+    expect(mocks.evidence).toHaveBeenCalledTimes(2);
+    expect(mocks.jev).not.toHaveBeenCalled();
+    expect(stored.size).toBe(1);
+  });
+  it("keeps GET read-only and hides saved Jev history after knowledge authorization changes", async () => {
+    messages = [wikiMessage()];
+    mocks.evidence.mockResolvedValue([approvedWiki]);
+    const before = await get();
+    expect(before.status).toBe(200);
+    expect((await before.json()).data.savedJevEvaluation).toBeNull();
+    expect(mocks.evidence).not.toHaveBeenCalled();
+
+    expect((await post()).status).toBe(200);
+    expect((await (await get()).json()).data.savedJevEvaluation).not.toBeNull();
+    mocks.jev.mockClear();
+    mocks.evidence.mockResolvedValue([]);
+
+    const after = await get();
+    expect(after.status).toBe(200);
+    const body = await after.json();
+    expect(body.data.dimensions.length).toBeGreaterThan(0);
+    expect(body.data.savedJevEvaluation).toBeNull();
+    expect(mocks.jev).not.toHaveBeenCalled();
+    expect(stored.size).toBe(1);
+  });
+  it("fails closed when current knowledge authorization cannot be read", async () => {
+    messages = [wikiMessage()];
+    mocks.evidence.mockResolvedValueOnce([approvedWiki]).mockRejectedValueOnce(new Error("unavailable"));
+    expect((await post()).status).toBe(409);
+    expect(mocks.jev).not.toHaveBeenCalled();
+    expect(stored.size).toBe(0);
+  });
+  it("uses scoped memory policy gates without sending memory receipts or Ontology bodies", async () => {
+    scope = { contactId };
+    const memoryId = "33333333-3333-4333-8333-333333333333";
+    const receipt: MemoryEvaluationRecall = {
+      recall_id: "44444444-4444-4444-8444-444444444444",
+      contact_id: contactId,
+      as_of: "2026-10-28T00:00:00Z",
+      coverage: "complete",
+      provider_status: "PRIVATE_MEMORY_PROVIDER_CANARY",
+      scope_valid: true,
+      memory_ids: [memoryId],
+      required_memory_ids: [],
+      invalid_memory_ids: [memoryId],
+      metadata_error_count: 0,
+      uncertain_policy_count: 0,
+      returned_count: 1,
+    };
+    mocks.recalls.mockResolvedValue([receipt]);
+    messages = [
+      {
+        role: "tool",
+        toolCallId: "ontology-outcome",
+        toolName: "ontology_describe_outcome",
+        content: "PRIVATE_ONTOLOGY_BODY_CANARY",
+        details: { outcome: { description: "PRIVATE_ONTOLOGY_DETAILS_CANARY" } },
+      },
+    ];
+
+    const response = await post();
+    expect(response.status).toBe(200);
+    expect(mocks.recalls).toHaveBeenCalledWith(expect.anything(), "org", [id]);
+    expect(mocks.jev).toHaveBeenCalledTimes(1);
+    const submitted = mocks.jev.mock.calls[0]![0].state;
+    expect(submitted).toMatchObject({
+      task: "Read product knowledge",
+      finalAnswer: finalText,
+      observations: [{ tool: "ontology_describe_outcome", status: "success" }],
+    });
+    expect(submitted.deterministicGates.flatMap((gate: { findingCodes: string[] }) => gate.findingCodes))
+      .toContain("memory_policy_invalid_injected");
+    const payload = JSON.stringify(submitted);
+    expect(payload).not.toMatch(/PRIVATE_MEMORY_PROVIDER|PRIVATE_ONTOLOGY|ontology-outcome/);
+    for (const subject of [contactId, memoryId, receipt.recall_id])
+      expect(payload).not.toContain(subject);
   });
   it("sends only currently authorized matching knowledge and invalidates cache after withdrawal", async () => {
     messages = [wikiMessage()];

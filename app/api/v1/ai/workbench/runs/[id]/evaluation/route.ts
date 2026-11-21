@@ -29,6 +29,7 @@ import {
   jevModelIsPinned,
   readJevConfiguration,
   jevAuthorizationFingerprint,
+  type JevAuthorizedEvidence,
 } from "@/lib/ai/evals/jev-judge";
 import { loadWorkbenchObservedEvidence } from "@/lib/ai/agents/workbench-observed-evidence";
 import { observedKnowledgeEvidence } from "@/lib/ai/knowledge/evidence";
@@ -392,6 +393,45 @@ async function assertJevPrivacy(admin: Admin, org: string, material: EvaluationM
   if (error || data?.length !== contacts.length) throw new Error("jev_contact_unavailable");
 }
 
+async function readApprovedJevKnowledge(
+  admin: Admin,
+  organizationId: string,
+  material: EvaluationMaterial,
+): Promise<JevAuthorizedEvidence[]> {
+  if (!observedKnowledgeEvidence(material.input.runtimeMessages).length) return [];
+  const evidence = await loadWorkbenchObservedEvidence(admin, {
+    organizationId,
+    agentId: material.input.agentId,
+    runIds: [
+      material.input.runId,
+      ...(material.input.collaborationRuns ?? []).map((child) => child.id),
+    ],
+  });
+  return evidence
+    .filter((item) => item.namespace === "organization_memory" || item.index_status === "current")
+    .map(({ id, namespace, revision, title, excerpt }) => ({ id, namespace, revision, title, excerpt }));
+}
+
+async function reauthorizeSavedJevReview(
+  admin: Admin,
+  organizationId: string,
+  material: EvaluationMaterial,
+  report: AgentEvalReport,
+): Promise<AgentEvalReport | null> {
+  const judge = report.semanticJudge;
+  const fingerprint = judge.choiceReview?.authorizationFingerprint ?? judge.authorizationFingerprint;
+  if (!fingerprint) return null;
+  try {
+    await assertJevPrivacy(admin, organizationId, material);
+    const approvedKnowledge = await readApprovedJevKnowledge(admin, organizationId, material);
+    if (jevAuthorizationFingerprint(approvedKnowledge) !== fingerprint) return null;
+    await assertJevPrivacy(admin, organizationId, material);
+    return report;
+  } catch {
+    return null;
+  }
+}
+
 function evaluationFingerprint(base: string, evaluator: string): string {
   return createHash("sha256").update(`${base}:${evaluator}`).digest("hex");
 }
@@ -465,12 +505,15 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     baseFingerprint: material.baseFingerprint,
     rubricRevision: WORKBENCH_SEMANTIC_RUBRIC_REVISION,
   });
-  const savedJevEvaluation = matchingSavedJevReview(saved.data ?? [], {
+  const matchedJevEvaluation = matchingSavedJevReview(saved.data ?? [], {
     runId: id,
     profileKey: material.profile.key,
     profileRevision: material.profile.revision,
     baseFingerprint: material.baseFingerprint,
   });
+  const savedJevEvaluation = matchedJevEvaluation
+    ? await reauthorizeSavedJevReview(admin, authz.org.orgId, material, matchedJevEvaluation)
+    : null;
   return ok(
     {
       ...report,
@@ -548,34 +591,18 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
         { requestId },
       );
     }
-    const historical = observedKnowledgeEvidence(material.input.runtimeMessages);
-    const readApprovedKnowledge = async () =>
-      historical.length
-        ? await loadWorkbenchObservedEvidence(admin, {
-            organizationId: authz.org.orgId,
-            agentId: material.input.agentId,
-            runIds: [id, ...(material.input.collaborationRuns ?? []).map((child) => child.id)],
-          })
-            .then((evidence) =>
-              evidence
-                .filter(
-                  (item) =>
-                    item.namespace === "organization_memory" || item.index_status === "current",
-                )
-                .map((item) => ({
-                  id: item.id,
-                  namespace: item.namespace,
-                  revision: item.revision,
-                  title: item.title,
-                  excerpt: item.excerpt,
-                })),
-            )
-            .catch(() => [])
-        : [];
-    const approvedKnowledge = await readApprovedKnowledge();
-    const authorizationFingerprint = jevAuthorizationFingerprint(approvedKnowledge);
+    let authorizationFingerprint: string;
+    try {
+      const approvedKnowledge = await readApprovedJevKnowledge(admin, authz.org.orgId, material);
+      authorizationFingerprint = jevAuthorizationFingerprint(approvedKnowledge);
+    } catch {
+      return fail("jev_scope_unavailable", "无法核对当前知识权限，不能外送历史材料。", 409, {
+        requestId,
+      });
+    }
     const evaluatorKey = jevEvaluatorKey(config.model, config.model, authorizationFingerprint);
     const stableFingerprint = evaluationFingerprint(material.baseFingerprint, evaluatorKey);
+    let matching: AgentEvalReport | null = null;
     // Aliases can resolve to a new model version. Never reuse them without a request.
     if (jevModelIsPinned(config.model)) {
       const { data: cached, error: cacheError } = await admin
@@ -589,48 +616,39 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
         .maybeSingle();
       if (cacheError)
         return fail("evaluation_read_failed", "无法核对 Jev 评测缓存。", 503, { requestId });
-      const matching =
-        cached?.report &&
-        matchingSavedJevReview([{ report: cached.report, input_fingerprint: stableFingerprint }], {
-          runId: id,
-          profileKey: material.profile.key,
-          profileRevision: material.profile.revision,
-          baseFingerprint: material.baseFingerprint,
-        });
-      if (matching) {
-        try {
-          await assertJevPrivacy(admin, authz.org.orgId, material);
-        } catch {
-          return fail(
-            "jev_scope_unavailable",
-            "评测对象的隐私状态已变化，不能继续使用历史评测。",
-            409,
-            { requestId },
-          );
-        }
-        return ok(
-          { ...matching, inputFingerprint: stableFingerprint, cached: true },
-          { requestId },
+      if (cached?.report) {
+        matching = matchingSavedJevReview(
+          [{ report: cached.report, input_fingerprint: stableFingerprint }],
+          {
+            runId: id,
+            profileKey: material.profile.key,
+            profileRevision: material.profile.revision,
+            baseFingerprint: material.baseFingerprint,
+          },
         );
       }
     }
+
+    let currentKnowledge: JevAuthorizedEvidence[];
     try {
+      currentKnowledge = await readApprovedJevKnowledge(admin, authz.org.orgId, material);
+      if (jevAuthorizationFingerprint(currentKnowledge) !== authorizationFingerprint)
+        return fail(
+          "jev_scope_unavailable",
+          "知识来源权限或版本在等待中变化，请核对后重新评测。",
+          409,
+          { requestId },
+        );
+      // Authority checks can await remote knowledge. Recheck contact privacy
+      // after that wait and immediately before returning or sending material.
       await assertJevPrivacy(admin, authz.org.orgId, material);
     } catch {
-      return fail("jev_scope_unavailable", "评测对象的隐私状态已变化，不能外送历史材料。", 409, {
+      return fail("jev_scope_unavailable", "无法核对当前知识权限或隐私状态。", 409, {
         requestId,
       });
     }
-    // Cache/privacy reads above can wait. Do not external-send the knowledge
-    // projection authorized before those waits if its current authority changed.
-    const currentKnowledge = await readApprovedKnowledge();
-    if (jevAuthorizationFingerprint(currentKnowledge) !== authorizationFingerprint)
-      return fail(
-        "jev_scope_unavailable",
-        "知识来源权限或版本在等待中变化，请核对后重新评测。",
-        409,
-        { requestId },
-      );
+    if (matching)
+      return ok({ ...matching, inputFingerprint: stableFingerprint, cached: true }, { requestId });
     const report = await runAgentEvaluation({
       run: material.input,
       profile: material.profile,

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   admin: vi.fn(),
   collaboration: vi.fn(),
+  refinement: vi.fn(),
+  runtimeState: vi.fn(),
   selectPlan: vi.fn(),
   scope: vi.fn(),
   tools: vi.fn(),
@@ -54,6 +56,9 @@ vi.mock("@/lib/ai/agents/collaboration", () => ({
 vi.mock("@/lib/ai/agents/workbench-collaboration", () => ({
   runWorkbenchCollaboration: mocks.collaboration,
 }));
+vi.mock("@/lib/ai/agents/refinement-workbench", () => ({
+  runWorkbenchRefinement: mocks.refinement,
+}));
 import { runWorkbenchStartJob } from "./workbench-start-job";
 
 const job = {
@@ -81,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.selectPlan.mockReturnValue(null);
   mocks.collaboration.mockResolvedValue(null);
+  mocks.runtimeState.mockReturnValue({ versionId: "agent-version1" });
   mocks.tools.mockResolvedValue({ tools: {}, cleanup: vi.fn() });
   mocks.scope.mockResolvedValue({
     contactId: null,
@@ -106,7 +112,7 @@ beforeEach(() => {
               agent_id: "agent1",
               task: "Check CRM",
               mode: "inspect",
-              runtime_state: { versionId: "agent-version1" },
+              runtime_state: mocks.runtimeState(),
               mission_id: null,
               scope: {},
               budget: {},
@@ -185,6 +191,7 @@ describe("Workbench initial organization memory", () => {
         }),
       }),
     );
+    expect(mocks.refinement).not.toHaveBeenCalled();
     expect(mocks.model.mock.calls[0]![0]).toHaveProperty("customerMemory", {
       contactId: scope.contactId,
       conversationId: scope.conversationId,
@@ -194,6 +201,19 @@ describe("Workbench initial organization memory", () => {
     });
     const specialist = readFileSync("lib/ai/agents/workbench-collaboration.ts", "utf8");
     expect(specialist).toMatch(/system:\s*\[\s*(?:\/\/[^\n]*\n\s*)*childConfig\.systemPrompt/);
+  });
+
+  it("keeps customer recall and normal collaboration out of opt-in refinement", async () => {
+    mocks.scope.mockResolvedValue({ contactId: "contact", leadId: "lead", conversationId: "conversation", pipelineId: null });
+    mocks.runtimeState.mockReturnValue({ versionId: "agent-version1", refinement: {} });
+    mocks.refinement.mockResolvedValue({ state: { lessonCodes: [], rounds: [] }, collaboration: null });
+
+    await expect(runWorkbenchStartJob(job, pool, "worker1")).rejects.toThrow("stop_after_model_input");
+
+    expect(mocks.refinement).toHaveBeenCalledOnce();
+    expect(mocks.selectPlan).toHaveBeenCalledWith(expect.objectContaining({ disabled: true }));
+    expect(mocks.collaboration).not.toHaveBeenCalled();
+    expect(mocks.model.mock.calls[0]![0]).not.toHaveProperty("customerMemory");
   });
 
   it("does not call the model when the policy database fails", async () => {
