@@ -19,6 +19,8 @@ import { randomUUID } from "node:crypto";
 import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
+import { isAppUrl } from "./utils/app-url";
+
 const svc = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -433,7 +435,7 @@ test.describe("o wizard monta um funcionário", () => {
     await expect(page.locator("body")).not.toContainText(/Nuvemshop/i);
 
     await page.getByRole("button", { name: /começar a usar/i }).click();
-    await page.waitForURL(/\/app\//, { timeout: 30_000 });
+    await page.waitForURL(isAppUrl, { timeout: 30_000 });
 
     const { data: org } = await svc
       .from("organizations")
