@@ -28,7 +28,7 @@ export function OntologyEvidence({ entries }: { entries: Entry[] }) {
         {entries.map(({ id, payload }) => {
           const receipt = asObject(payload.receipt);
           return (
-            <div key={id} className="space-y-1 rounded border p-3 break-words">
+            <div key={id} className="space-y-1 rounded-md border p-3 break-words">
               <p>
                 状态：{statuses[String(payload.status)] ?? "概念发现"}
                 {payload.degraded ? "（降级）" : ""}

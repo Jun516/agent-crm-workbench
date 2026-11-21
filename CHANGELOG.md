@@ -8,13 +8,7 @@ Se você roda o pi-native-crm numa VPS, **leia a seção da versão para a qual 
 
 ## [Não lançado]
 
-### Agent CRM Workbench 合并升级
-
-- 将 Pi Agent Core 和 Pi AI 升级至 1.3.0，同步 Next.js、Sentry 和 MCP SDK 版本并适配工作台执行链路。
-- 增加客户记忆审核、有效期、锁定、使用回执及指标，接入 Ontology 只读工具、专家冲突升级和 Mission 方向与发送控制。
-- 增加工作台 Motion 动效，尊重系统减弱动态效果设置。SSE 进入终态后保留终态并只补读一次。
-- 保留精确工具授权、有界只读自精炼、Jev 和知识与隐私复验。Jev 在外送或返回缓存前复核知识与联系人权限，读取历史评测时隐藏已失效的 Jev 结果。
-- 提供 `pnpm verify:crm` 作为本机合成场景的自动核验入口。数据库升级需先备份，按顺序应用 0409–0414。[验证与迁移说明](docs/testing/verify-crm.md)
+- 合并 Pi 1.3、客户记忆、Ontology、Mission 治理与动效，保留四项工作台定制。[验证与 0409–0414 迁移](docs/testing/verify-crm.md)
 
 - Para remover os guias auxiliares instalados por download, use `curl -fsSL <url-do-pi-native-crm>/scripts/instalar-guias.sh | bash -s -- --remover`.
 

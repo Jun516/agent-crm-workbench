@@ -9,7 +9,6 @@ import { executeRuntimeReadPlan } from "@/lib/ontology/execute-runtime-read-plan
 
 const question = { question: z.string().min(1).max(2000) };
 const common = {
-  category: "read" as const,
   requiresRole: "agent" as const,
   requiresScope: "mcp:read" as const,
 };
@@ -24,6 +23,7 @@ const unavailable = {
 
 export const ontologySearchTerms: McpToolDefinition<typeof question> = {
   ...common,
+  category: "read",
   name: "ontology_search_terms",
   description:
     "Busca conceitos no catálogo publicado; correspondência não certifica definição comercial.",
@@ -38,6 +38,7 @@ export const ontologySearchTerms: McpToolDefinition<typeof question> = {
 };
 export const ontologyCheckAnswerable: McpToolDefinition<typeof question> = {
   ...common,
+  category: "read",
   name: "ontology_check_answerable",
   description:
     "Verifica se uma pergunta corresponde a uma consulta revisada e identifica definições ausentes.",
@@ -66,6 +67,7 @@ const queryShape = {
 };
 export const ontologyQuery: McpToolDefinition<typeof queryShape> = {
   ...common,
+  category: "read",
   name: "ontology_query",
   description:
     "Consulta somente modelos revisados. Para lacuna de atividades, use apenas critérios fornecidos explicitamente pelo usuário, rotule como hipótese e nunca como definição certificada; se faltarem, peça esclarecimento. Em degradação use as ferramentas de leitura existentes e informe a limitação. Não aceita SQL, organização ou escopo.",
@@ -130,6 +132,7 @@ export const ontologyQuery: McpToolDefinition<typeof queryShape> = {
 const actionShape = { capability: z.string().regex(/^[a-z][a-z0-9_]*$/).max(100) };
 export const ontologyDescribeAction: McpToolDefinition<typeof actionShape> = {
   ...common, name: "ontology_describe_action",
+  category: "read",
   description: "Descreve uma capacidade CRM registrada e suas condições; não autoriza ou executa ações.",
   inputSchema: actionShape,
   handler: async ({ capability }) => {
@@ -145,6 +148,7 @@ export const ontologyDescribeAction: McpToolDefinition<typeof actionShape> = {
 const outcomeShape = {};
 export const ontologyDescribeOutcome: McpToolDefinition<typeof outcomeShape> = {
   ...common, name: "ontology_describe_outcome",
+  category: "read",
   description: "Descreve o contrato da Mission deste Run e os limites da evidência; não avalia sucesso.",
   inputSchema: outcomeShape,
   handler: async (_input, ctx) => {

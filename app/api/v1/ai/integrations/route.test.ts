@@ -4,12 +4,16 @@ const mock = vi.hoisted(() => ({
   role: vi.fn(),
   support: vi.fn(),
   query: vi.fn(),
+  release: vi.fn(),
   audit: vi.fn(),
 }));
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: mock.role }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: mock.support }));
 vi.mock("@/lib/agent-engine/db/request-pool", () => ({
-  getRequestPool: () => ({ query: mock.query }),
+  getRequestPool: () => ({
+    query: mock.query,
+    connect: async () => ({ query: mock.query, release: mock.release }),
+  }),
 }));
 vi.mock("@/lib/audit", () => ({ audit: mock.audit }));
 import { GET, PATCH } from "./route";
@@ -128,40 +132,61 @@ describe("provider configuration API boundaries", () => {
       ).status,
     ).toBe(403);
   });
-  it("customer-memory mutations require manager and explicit fact confirmation", async () => {
-    expect(
-      (
-        await saveMemory(
-          req({ contact_id: id, request_key: id, category: "preference", body: "Email" }, "POST"),
-        )
-      ).status,
-    ).toBe(400);
+});
+
+describe("customer memory API boundaries", () => {
+  const preference = {
+    contact_id: "a0000000-0000-4000-8000-000000000003",
+    request_key: id,
+    category: "preference",
+    body: "Email",
+  };
+
+  it("requires explicit confirmation and agent-level access before checking customer ownership", async () => {
+    expect((await saveMemory(req(preference, "POST"))).status).toBe(400);
+    expect(mock.role).not.toHaveBeenCalled();
     mock.role.mockResolvedValueOnce({
       ok: false,
       response: new Response("denied", { status: 403 }),
     });
-    expect(
-      (
-        await saveMemory(
-          req(
-            {
-              contact_id: id,
-              request_key: id,
-              category: "preference",
-              body: "Email",
-              confirmed: true,
-            },
-            "POST",
-          ),
-        )
-      ).status,
-    ).toBe(403);
-    expect(mock.role).toHaveBeenCalledWith("manager", expect.anything());
+    expect((await saveMemory(req({ ...preference, confirmed: true }, "POST"))).status).toBe(
+      403,
+    );
+    expect(mock.role).toHaveBeenCalledWith(
+      "agent",
+      expect.objectContaining({ resource: "ai_workbench" }),
+    );
+    expect(mock.query).not.toHaveBeenCalled();
+  });
+
+  it("denies direct confirmation when an agent is not assigned to the customer", async () => {
+    mock.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("from contacts")) return { rows: [{ id: preference.contact_id }] };
+      if (sql.includes("from user_organizations")) return { rows: [{ role: "agent" }] };
+      return { rows: [] };
+    });
+    expect((await saveMemory(req({ ...preference, confirmed: true }, "POST"))).status).toBe(
+      403,
+    );
+    expect(mock.query).toHaveBeenCalledWith("rollback");
+    expect(mock.release).toHaveBeenCalledTimes(1);
+    expect(mock.query).not.toHaveBeenCalledWith(
+      expect.stringContaining("insert into ai_customer_memories"),
+      expect.anything(),
+    );
+    expect(mock.audit).not.toHaveBeenCalled();
+  });
+
+  it("requires manager access to retire a memory", async () => {
     mock.role.mockResolvedValueOnce({
       ok: false,
       response: new Response("denied", { status: 403 }),
     });
     expect((await deleteMemory(req({ id }, "DELETE"))).status).toBe(403);
+    expect(mock.role).toHaveBeenCalledWith(
+      "manager",
+      expect.objectContaining({ resource: "ai_workbench" }),
+    );
     expect(mock.query).not.toHaveBeenCalled();
   });
 });

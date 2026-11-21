@@ -88,7 +88,7 @@ describe("tool declarada read não grava no banco", () => {
     // abaixo passaria varrendo o vazio — verde por instrumento morto, indistinguível
     // de verde por estar tudo certo. Este número já me pegou uma vez: uma janela de
     // regex truncou uma entrada em silêncio e a contagem saiu menor que a real.
-    expect(definicoes.length).toBe(TOOL_CATALOG.length);
+    expect(definicoes.map(({ name }) => name).sort()).toEqual(TOOL_CATALOG.map(({ name }) => name).sort());
   });
 
   it("CONTROLE: o detector reconhece mutação quando ela existe", () => {
