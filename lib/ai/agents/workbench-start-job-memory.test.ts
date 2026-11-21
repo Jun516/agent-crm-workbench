@@ -137,6 +137,7 @@ function setGovernedPlan() {
       code: "evidence_disagreement",
       specialistKeys: ["first", "second"],
       field: "lead.stage",
+      message: "Conflicting stage evidence",
     }]),
     usage: { inputTokens: 120, outputTokens: 60, costCents: 2 },
     results: [{}, {}],

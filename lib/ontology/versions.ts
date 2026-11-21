@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { validateOntology, type Ontology } from "./contract";
-import snapshotV1 from "@/docs/audits/ontology-32/snapshot-v1.json";
+import snapshotV1 from "./snapshot-v1.json";
 
 // Canonicalização ordena chaves, preservando a ordem semântica de arrays.
 function canonical(value: unknown): string {
