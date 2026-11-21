@@ -661,7 +661,7 @@ try {
   );
   await check("mobile: actual CustomerMemoryPanel disclosure", async () => {
     await expect(memoryPage.getByText("客户希望通过文字接收明确的下一步建议。")).toBeVisible();
-    const toggle = memoryPage.getByRole("button", { name: "记忆保存与同步说明", exact: true });
+    const toggle = memoryPage.getByRole("button", { name: "同步与清理状态（运维）", exact: true });
     await toggle.focus();
     await toggle.press("Enter");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
