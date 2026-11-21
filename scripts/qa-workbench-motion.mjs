@@ -3,7 +3,7 @@
  * Run: node scripts/qa-workbench-motion.mjs
  * Build-only check: node scripts/qa-workbench-motion.mjs --build-only
  * Manual offline preview: node scripts/qa-workbench-motion.mjs --serve
- * Requires installed repo dependencies and Chromium (CHROMIUM_PATH overrides).
+ * Uses Playwright's installed Chromium unless CHROMIUM_PATH overrides it.
  * Uses the real Workbench, Sheet, MotionDisclosure and globals.css. Only API
  * responses and the containing viewport are fixtures; no provider is activated.
  * Temporary files and evidence stay in ignored .prova/motion/.
@@ -403,7 +403,7 @@ try {
     await new Promise(() => {});
   }
   browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
+    executablePath: process.env.CHROMIUM_PATH || undefined,
     headless: true,
     args: ["--no-sandbox"],
   });
