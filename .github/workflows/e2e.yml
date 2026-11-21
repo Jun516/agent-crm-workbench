@@ -1087,6 +1087,7 @@ jobs:
       # compartilhado não deve chamá-lo nem gastar credenciais externas.
       # customer-memory-loop usa a pilha local WAHA e Redis e o usuário
       # criado pelo bootstrap do cenário especializado de memória.
+      # agent-workbench-ontology usa um worker ativo e um provedor local determinístico.
       FORA_DO_CI: >-
         inbox-tempo-real.spec.ts
         cadastro-sem-confirmacao-de-email.spec.ts
@@ -1097,6 +1098,7 @@ jobs:
         agent-semantic-judge-real-model.spec.ts
         agent-workbench-structured-result-real-model.spec.ts
         customer-memory-loop.spec.ts
+        agent-workbench-ontology.spec.ts
     steps:
       # ── O RELÓGIO DESTA PARTE: ONDE O TETO DE 30 MIN COMEÇA A CONTAR ──────
       #

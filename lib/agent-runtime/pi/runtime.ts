@@ -242,7 +242,11 @@ function runtimeEvent(event: AgentEvent): AgentRuntimeEvent {
     case "tool_execution_start":
       return {
         type: event.type,
-        data: { tool_call_id: event.toolCallId, tool_name: event.toolName, args: event.args },
+        data: {
+          tool_call_id: event.toolCallId,
+          tool_name: event.toolName,
+          args: event.toolName.startsWith("ontology_") ? { redacted: true } : event.args,
+        },
       };
     case "tool_execution_update":
       return {
@@ -250,7 +254,9 @@ function runtimeEvent(event: AgentEvent): AgentRuntimeEvent {
         data: {
           tool_call_id: event.toolCallId,
           tool_name: event.toolName,
-          partial_result: event.partialResult,
+          partial_result: event.toolName.startsWith("ontology_")
+            ? "[redacted]"
+            : event.partialResult,
         },
       };
     case "tool_execution_end":

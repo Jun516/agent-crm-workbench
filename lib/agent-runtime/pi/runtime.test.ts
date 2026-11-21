@@ -192,6 +192,34 @@ describe("PiAgentRuntime", () => {
     expect(JSON.stringify(result.events)).not.toContain(direction);
   });
 
+  it("projects semantic tool events without the private question", async () => {
+    const question = "private semantic question fixture";
+    const { runtime } = runtimeWithFaux([
+      fauxAssistantMessage(fauxToolCall("ontology_query", { question }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("done"),
+    ]);
+    const execute = vi.fn(async () => ({ content: "semantic fixture" }));
+    const result = await runtime.run({
+      systemPrompt: "Use the semantic tool.",
+      prompt: "check",
+      model,
+      maxTurns: 2,
+      tools: [{
+        name: "ontology_query",
+        description: "Query fixture",
+        inputSchema: { type: "object", properties: { question: { type: "string" } } },
+        capability: "read",
+        execute,
+      }],
+    });
+    expect(execute).toHaveBeenCalledWith({ question }, expect.anything());
+    expect(result.events).toContainEqual({
+      type: "tool_execution_start",
+      data: expect.objectContaining({ tool_name: "ontology_query", args: { redacted: true } }),
+    });
+    expect(JSON.stringify(result.events)).not.toContain(question);
+  });
+
   it("acknowledges only the observed context for each successful transformed request", async () => {
     const { runtime } = runtimeWithFaux([
       fauxAssistantMessage(fauxToolCall("lookup", {}), { stopReason: "toolUse" }),

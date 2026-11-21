@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CustomerMemoryCandidates } from "@/components/ai/CustomerMemoryCandidates";
 import { CustomerMemoryUsage } from "@/components/ai/CustomerMemoryUsage";
 import { MissionSendControl } from "./MissionSendControl";
+import { MissionDirectionControl } from "./MissionDirectionControl";
+import { OntologyEvidence } from "./OntologyEvidence";
+import {
+  EXPERT_CONFLICT_UNRESOLVED,
+  expertConflictNotice,
+  expertConflictTimelineNote,
+} from "@/lib/ai/agents/expert-conflict-governance";
 import { RefinementControls } from "./RefinementControls";
 import { JevEvaluationControls } from "./JevEvaluationControls";
 import type { JevChoiceReview } from "@/lib/ai/evals/contracts";
@@ -73,6 +80,9 @@ type Detail = Run & {
     goal: string;
     acceptance_criteria: string;
     customer_send_paused: boolean;
+    current_direction?: string | null;
+    direction_revision?: number | string | null;
+    direction_consumed_revision?: number | string | null;
     acceptance_contract: {
       revision: 1;
       checks: Array<
@@ -175,6 +185,7 @@ const EVENT_LABELS: Record<string, string> = {
   specialist_failed: "只读 Specialist 失败",
   collaboration_conflict: "Specialist 证据冲突",
   collaboration_completed: "多 Agent 审查完成",
+  manager_direction_consumed: "模型已读取负责人方向",
   usage_reported: "用量已记录",
 };
 
@@ -656,6 +667,7 @@ export function AgentCrmWorkbench({
     () => detail?.proposals.filter((proposal) => proposal.status === "pending") ?? [],
     [detail],
   );
+  const conflictNotice = detail ? expertConflictNotice(detail.events) : null;
 
   const activeRun = Boolean(
     detail && ["queued", "running", "awaiting_confirmation"].includes(detail.status),
@@ -885,9 +897,11 @@ export function AgentCrmWorkbench({
                 readOnly={readOnly}
               />
             )}
-            {detail?.error_code && (
+            {detail?.error_code === EXPERT_CONFLICT_UNRESOLVED ? (
+              <p className="text-sm text-destructive">专家冲突未解决，CRM 写入已停止。</p>
+            ) : detail?.error_code ? (
               <p className="text-sm text-destructive">运行错误：{detail.error_code}</p>
-            )}
+            ) : null}
             {detail?.evaluationError && (
               <button
                 onClick={() => openPanel("details")}
@@ -1206,9 +1220,25 @@ export function AgentCrmWorkbench({
                             客户发送已被负责人暂停；旧审批不能继续发送。
                           </p>
                         )}
-                        <MissionSendControl
+                        <MissionDirectionControl
                           key={detail.mission.id}
                           mission={detail.mission}
+                          readOnly={readOnly}
+                          onAccepted={async ({ runId }) => {
+                            const request = ++readingHistory.current;
+                            const loaded = await fetchDetail(runId);
+                            if (request !== readingHistory.current) return;
+                            setDetail(loaded);
+                            const url = new URL(window.location.href);
+                            url.searchParams.set("run", runId);
+                            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+                            await loadRuns();
+                          }}
+                        />
+                        <MissionSendControl
+                          key={`${detail.mission.id}:send`}
+                          mission={detail.mission}
+                          readOnly={readOnly}
                           onUpdated={async (paused) => {
                             const runId = detail.id;
                             setDetail((current) =>
@@ -1236,6 +1266,12 @@ export function AgentCrmWorkbench({
                             当前原因：{detail.mission.blocked_reason}
                           </p>
                         )}
+                      </section>
+                    )}
+                    {conflictNotice && (
+                      <section className="rounded-lg border p-3 text-sm" aria-label={conflictNotice.title}>
+                        <p className="font-medium text-destructive">{conflictNotice.title}</p>
+                        <p className="mt-1 text-muted-foreground">{conflictNotice.body}</p>
                       </section>
                     )}
                     <div className="rounded-lg bg-muted/60 p-3 text-sm">
@@ -1583,23 +1619,34 @@ export function AgentCrmWorkbench({
                       执行时间线 · {detail.events.length} 条事件
                     </summary>
                     <div className="mt-3 space-y-3 break-words">
-                      {detail?.events.map((event) => (
-                        <div key={event.id} className="flex gap-3 text-sm">
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                          <div>
-                            <p className="font-medium">{eventLabel(event)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(event.created_at).toLocaleTimeString()} ·{" "}
-                              {Object.entries(event.payload ?? {})
-                                .filter(([key]) => !/id$/.test(key))
-                                .map(([key, value]) => `${key}: ${String(value)}`)
-                                .join(" · ")}
-                            </p>
+                      {detail.events.map((event) => {
+                        const conflictNote = expertConflictTimelineNote(event);
+                        return (
+                          <div key={event.id} className="flex gap-3 text-sm">
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                            <div>
+                              <p className="font-medium">{eventLabel(event)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(event.created_at).toLocaleTimeString()} ·{" "}
+                                {Object.entries(event.payload ?? {})
+                                  .filter(([key]) => !/id$/.test(key))
+                                  .map(([key, value]) => `${key}: ${String(value)}`)
+                                  .join(" · ")}
+                              </p>
+                              {conflictNote && <p className="text-xs text-destructive">{conflictNote}</p>}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </details>
+                )}
+                {detail && (
+                  <OntologyEvidence
+                    entries={detail.events.filter(
+                      (event) => event.event_type === "tool_completed" && event.payload.ontologyObservation === true,
+                    )}
+                  />
                 )}
                 {Boolean(detail?.observed_evidence?.length) && (
                   <section

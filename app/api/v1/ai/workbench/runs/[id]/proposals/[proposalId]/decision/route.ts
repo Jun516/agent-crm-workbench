@@ -308,7 +308,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     agent,
     deps.log,
     proposal.tool_name === "crm_request_human_handoff"
-      ? { confirmationTools: ["crm_request_human_handoff"] }
+      ? { confirmationTools: ["crm_request_human_handoff"], workbenchRunId: id }
       : undefined,
   );
   try {

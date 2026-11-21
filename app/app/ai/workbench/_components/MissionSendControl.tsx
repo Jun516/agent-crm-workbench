@@ -7,18 +7,20 @@ type Command = "pause_customer_send" | "resume_customer_send";
 export function MissionSendControl({
   mission,
   onUpdated,
+  readOnly = false,
 }: {
   mission: { id: string; status: string; customer_send_paused: boolean };
   onUpdated: (paused: boolean) => Promise<void>;
+  readOnly?: boolean;
 }) {
   const [reason, setReason] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const pending = useRef<{ command: Command; reason: string; requestKey: string } | null>(null);
-  const terminal = ["completed", "cancelled"].includes(mission.status);
+  const disabled = readOnly || ["completed", "cancelled"].includes(mission.status);
   const submit = async () => {
-    if (inFlight.current || terminal || reason.trim().length < 5) return;
+    if (inFlight.current || disabled || reason.trim().length < 5) return;
     inFlight.current = true;
     setSending(true);
     setError("");
@@ -49,7 +51,7 @@ export function MissionSendControl({
       setSending(false);
     }
   };
-  if (terminal) return null;
+  if (disabled) return null;
   return (
     <div className="mt-3 space-y-2 border-t pt-3">
       <label className="block text-xs">

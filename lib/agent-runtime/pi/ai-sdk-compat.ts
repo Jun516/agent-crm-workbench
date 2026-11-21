@@ -217,6 +217,7 @@ export function adaptAiTools(tools: ToolSet | undefined): RuntimeTool[] {
           const value = await (execute as (args: unknown, options: unknown) => unknown)(args, {
             toolCallId: context.toolCallId,
             messages: [],
+            abortSignal: context.signal,
           });
           return adaptedToolResult(value);
         },

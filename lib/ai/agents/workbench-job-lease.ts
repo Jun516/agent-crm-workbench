@@ -4,13 +4,13 @@ import type { JobRow } from "@/lib/agent-engine/queue/queue";
 
 /** Fail closed before CRM writes when a long-running worker has lost its queue lease. */
 export async function assertWorkbenchJobLease(
-  pool: Pool,
+  database: Pick<Pool, "query">,
   job: JobRow,
   workerId: string,
 ): Promise<void> {
   const claim = claimOfJob(job);
   if (!claim || claim.worker_id !== workerId) throw new Error("workbench_job_lease_missing");
-  const { rows } = await pool.query<{ current: boolean }>(
+  const { rows } = await database.query<{ current: boolean }>(
     `select exists (
        select 1 from job_queue j
        join ai_workbench_runs r on r.organization_id=j.organization_id

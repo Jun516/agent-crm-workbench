@@ -15,7 +15,7 @@ import type { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { auditMcpToolCall } from "./audit";
-import { ensureRole, ensureScope, ensureToolGrant, type McpAuthResult } from "./auth";
+import { McpAuthError, ensureRole, ensureScope, ensureToolGrant, type McpAuthResult } from "./auth";
 import { allTools } from "./tools";
 import { higienizarUuidsDeAterro } from "./uuid-de-aterro";
 import type { McpContext } from "./types";
@@ -59,7 +59,7 @@ export function createMcpServer(auth: McpAuthResult, requestId: string): McpServ
         description: tool.description,
         inputSchema: tool.inputSchema,
       },
-      async (rawArgs) => {
+      async (rawArgs, extra) => {
         const startedAt = Date.now();
         // A MESMA higiene do outro ingresso (`lib/ai/runtime/tools.ts`), pela
         // mesma razão: um uuid de aterro em campo opcional vira filtro por um
@@ -78,6 +78,7 @@ export function createMcpServer(auth: McpAuthResult, requestId: string): McpServ
           actor: auth.actor,
           apiTokenId: auth.apiTokenId,
           requestId,
+          signal: extra.signal,
           supabase,
         };
 
@@ -110,7 +111,9 @@ export function createMcpServer(auth: McpAuthResult, requestId: string): McpServ
             structuredContent: result as Record<string, unknown>,
           };
         } catch (err) {
-          const message = err instanceof Error ? err.message : "unknown_error";
+          const message = tool.name.startsWith("ontology_")
+            ? err instanceof McpAuthError ? "ontology_forbidden" : "ontology_tool_unavailable"
+            : err instanceof Error ? err.message : "unknown_error";
           const durationMs = Date.now() - startedAt;
 
           await auditMcpToolCall({

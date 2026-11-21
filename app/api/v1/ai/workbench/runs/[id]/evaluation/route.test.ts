@@ -27,7 +27,10 @@ vi.mock("@/lib/ai/evals/run-evaluation", () => ({ runAgentEvaluation: mocks.eval
 import { GET, POST } from "./route";
 const id = "11111111-1111-4111-8111-111111111111";
 const contact = "a0000000-0000-4000-8000-000000000001";
-function stub(failure?: string, corruptChild = false, missingState = false, scoped = false) {
+function stub(
+  failure?: string,
+  { corruptChild = false, missingState = false, scoped = false, governed = false } = {},
+) {
   mocks.from.mockImplementation((table: string) => {
     let multiple = false;
     let child = false;
@@ -42,7 +45,8 @@ function stub(failure?: string, corruptChild = false, missingState = false, scop
                 agent_id: "agent",
                 task: "Read CRM",
                 mode: "inspect",
-                status: "completed",
+                status: governed ? "partial" : "completed",
+                ...(governed ? { error_code: "expert_conflict_unresolved" } : {}),
                 final_text: "Result",
                 runtime_state: {},
                 ...(scoped ? { scope: { contactId: contact } } : {}),
@@ -58,7 +62,18 @@ function stub(failure?: string, corruptChild = false, missingState = false, scop
               ? [{ id: contact }]
               : table === "ai_agents"
                 ? { origin: "user" }
-                : [],
+                : table === "ai_agent_run_events" && governed && !multiple
+                  ? [
+                      {
+                        id: "conflict", sequence: 1, event_type: "collaboration_conflict",
+                        payload: { writes: "stopped", unresolved: true },
+                      },
+                      {
+                        id: "partial", sequence: 2, event_type: "run_partial",
+                        payload: { reason: "expert_conflict_unresolved" },
+                      },
+                    ]
+                  : [],
     });
     const builder = {
       select: () => builder,
@@ -98,7 +113,7 @@ beforeEach(() => {
 });
 describe("real evaluation material is required", () => {
   it("uses SQL receipts for scoped root and specialist runs and invalidates stale reviews", async () => {
-    stub(undefined, false, false, true);
+    stub(undefined, { scoped: true });
     const receipt = { recall_id: "receipt", contact_id: contact, coverage: "complete" };
     const receipts = [receipt];
     mocks.memory.mockResolvedValue(receipts);
@@ -123,7 +138,7 @@ describe("real evaluation material is required", () => {
     expect(updated.inputFingerprint).not.toBe(first.inputFingerprint);
   });
   it("fails visibly when native memory receipts cannot be independently loaded", async () => {
-    stub(undefined, false, false, true);
+    stub(undefined, { scoped: true });
     mocks.memory.mockRejectedValue(new Error("SQL unavailable"));
     const response = await GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
       params: Promise.resolve({ id }),
@@ -176,7 +191,7 @@ describe("real evaluation material is required", () => {
     },
   );
   it("rejects corrupt specialist messages instead of silently dropping them", async () => {
-    stub(undefined, true);
+    stub(undefined, { corruptChild: true });
     const response = await GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
       params: Promise.resolve({ id }),
     });
@@ -184,12 +199,28 @@ describe("real evaluation material is required", () => {
     expect(mocks.evaluate).not.toHaveBeenCalled();
   });
   it("does not grade a completed run whose persisted observations are missing", async () => {
-    stub(undefined, false, true);
+    stub(undefined, { missingState: true });
     const response = await GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
       params: Promise.resolve({ id }),
     });
     expect(response.status).toBe(409);
     expect(mocks.evaluate).not.toHaveBeenCalled();
+  });
+  it("evaluates a documented pre-model governance stop without fabricating a parent transcript", async () => {
+    stub(undefined, { missingState: true, governed: true });
+    const response = await GET(new NextRequest(`http://localhost/runs/${id}/evaluation`), {
+      params: Promise.resolve({ id }),
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        run: expect.objectContaining({
+          status: "partial",
+          runtimeMessages: [],
+          collaborationRuns: [expect.objectContaining({ id: "child" })],
+        }),
+      }),
+    );
   });
   it("fails visibly when persisted review storage cannot be read and never invokes a judge", async () => {
     stub("ai_agent_eval_reports");

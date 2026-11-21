@@ -52,7 +52,10 @@ describe("Vercel AI compatibility adapter", () => {
       maxSteps: 4,
     });
 
-    expect(execute).toHaveBeenCalledWith({ id: "lead-1" }, expect.anything());
+    expect(execute).toHaveBeenCalledWith(
+      { id: "lead-1" },
+      expect.objectContaining({ abortSignal: expect.objectContaining({ aborted: false }) }),
+    );
     expect(result.text).toBe("found it");
     expect(result.steps[0]?.toolCalls[0]?.toolName).toBe("lookup");
     expect(result.response.messages.some((message) => message.role === "tool")).toBe(true);

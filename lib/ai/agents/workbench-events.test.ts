@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { redactEventPayload } from "./workbench-events";
 
 describe("CRM workbench event payloads", () => {
+  it("persists the parent governance result without raw expert observations", () => {
+    expect(redactEventPayload("collaboration_conflict", {
+      code: "evidence_disagreement",
+      specialistKeys: ["first", "second"],
+      field: "lead.stage",
+      governance: "ask",
+      writes: "stopped",
+      unresolved: true,
+      privateValue: "raw field value",
+    })).toEqual({
+      code: "evidence_disagreement",
+      specialistKeys: ["first", "second"],
+      field: "lead.stage",
+      governance: "ask",
+      writes: "stopped",
+      unresolved: true,
+    });
+  });
   it("keeps only the product-safe fields for each event", () => {
     expect(redactEventPayload("context_loaded", {
       contactId: "contact-1", conversationId: "conversation-1", messageBody: "private customer content",

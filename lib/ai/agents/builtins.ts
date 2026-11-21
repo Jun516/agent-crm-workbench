@@ -30,12 +30,13 @@ export interface BuiltinAgentDefinition {
 export const BUILTIN_AGENTS: readonly BuiltinAgentDefinition[] = [
   {
     key: "crm_intelligence",
-    revision: 3,
+    revision: 4,
     name: "CRM 情报员",
     description: "汇总客户、会话、商机、任务与知识中的证据，回答业务问题。",
     systemPrompt:
       "你是 CRM 情报员。先通过只读 CRM 工具核对事实，再回答。明确区分数据库事实、推断与未知；引用记录标识或来源，不得修改 CRM 状态、发送消息或声称执行了未执行的操作。",
     toolIds: [
+      "ontology_search_terms", "ontology_check_answerable", "ontology_query", "ontology_describe_action", "ontology_describe_outcome",
       "crm_search_contacts",
       "crm_get_contact",
       "crm_list_leads",
@@ -80,12 +81,13 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDefinition[] = [
   },
   {
     key: "sales_operations",
-    revision: 3,
+    revision: 5,
     name: "销售运营 Agent",
     description: "发现漏斗跟进缺口，并在授权范围内提出或执行 CRM 内部操作。",
     systemPrompt:
-      "你是销售运营 Agent。先检查商机和跟进记录，再说明拟议动作及影响对象。只通过 CRM 工具操作；不确定时先询问。不可伪造成功。外部发送和不可逆动作必须停下来等待人工确认。",
+      "你是销售运营 Agent。先检查商机和跟进记录，拟议动作前调用 ontology_describe_action；若是 Mission，调用 ontology_describe_outcome 核对验收证据。只通过 CRM 工具操作；不确定时先询问。不可伪造成功。外部发送和不可逆动作必须停下来等待人工确认。",
     toolIds: [
+      "ontology_search_terms", "ontology_check_answerable", "ontology_query", "ontology_describe_action", "ontology_describe_outcome",
       "crm_list_leads",
       "crm_get_lead",
       "crm_get_contact",
@@ -174,12 +176,13 @@ export const BUILTIN_AGENTS: readonly BuiltinAgentDefinition[] = [
   },
   {
     key: "crm_supervisor",
-    revision: 5,
+    revision: 6,
     name: "CRM 主管 Agent",
     description: "跨漏斗、任务与执行记录发现运营异常，给出可审核的修复计划。",
     systemPrompt:
       "你是 CRM 主管 Agent。先跨模块核对异常，再给出优先级、影响范围和可验证的修复计划。每类 CRM 只读工具在结果充分时最多调用一次；不得重复读取相同范围来凑证据。完成关键读取后立即输出清晰的结论和依据，不要以空答复结束。批量修改前逐项确认作用对象；部分成功必须如实列出，失败不得掩盖。若当前商机 Mission 缺少内部事实，可先用 list_internal_colleagues 查找已绑定同事，再用 ask_internal_colleague 提出一个确切问题；此调用只会生成待审提案，绝不代表已发出或收到回复。不可把建议或提案描述成已完成。",
     toolIds: [
+      "ontology_search_terms", "ontology_check_answerable", "ontology_query", "ontology_describe_action", "ontology_describe_outcome",
       "crm_list_leads",
       "crm_get_lead",
       "crm_get_contact",

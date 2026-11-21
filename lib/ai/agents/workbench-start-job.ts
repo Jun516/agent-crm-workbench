@@ -1,4 +1,10 @@
 import { followupProposalPreview } from "./workbench-proposal-preview";
+import { missionProposalScopeRefusal } from "@/lib/ontology/mission-semantics";
+import {
+  ontologyObjectScopeRefusal,
+  ontologyPipelineScope,
+  recordOntologyObservation,
+} from "@/lib/ai/agents/workbench-ontology-observation";
 import { composeSystemPrompt, loadOrgMemory, orgMemoryProvenance, renderOrgMemory } from "@/lib/agent-engine/agent/org-memory";
 import type { JobRow } from "@/lib/agent-engine/queue/queue";
 import type { Pool } from "pg";
@@ -9,6 +15,7 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { buildMcpTurnTools } from "@/lib/agent-engine/edge/crm/mcp-tools";
 import type { RunModelCallInput, ToolSet } from "@/lib/agent-engine/edge/llm/run-model-call";
 import { appendWorkbenchEvent } from "@/lib/ai/agents/workbench-events";
+import { commitWorkbenchGovernanceStop } from "@/lib/ai/agents/workbench-transaction-events";
 import {
   loadMissionDirectionContextProbe, persistMissionRunMessagesAndDirectionAck,
 } from "@/lib/ai/agents/mission-direction-consumption";
@@ -30,6 +37,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertWorkbenchJobLease } from "@/lib/ai/agents/workbench-job-lease";
 import { collaborationPlanForMission, selectCollaborationPlan } from "@/lib/ai/agents/collaboration";
 import { formatCollaborationContext } from "@/lib/ai/agents/collaboration-runtime";
+import { parentTurnAfterExperts } from "@/lib/ai/agents/expert-conflict-governance";
 import { runWorkbenchCollaboration } from "@/lib/ai/agents/workbench-collaboration";
 import { runWorkbenchRefinement } from "@/lib/ai/agents/refinement-workbench";
 import { refinementOptionsSchema, renderRefinementLessons } from "@/lib/ai/agents/refinement";
@@ -275,6 +283,7 @@ export async function runWorkbenchStartJob(
       type: "context_loaded",
       payload: { ...orgMemoryProvenance(orgMemory), memoryResolution: "current_published" },
     });
+    const ontologyPipelineIds = ontologyPipelineScope(scope);
     modelAgentConfig.pipelineIds = scope.pipelineId ? [scope.pipelineId] : [];
     const { data: agentMetadata, error: agentMetadataError } = await admin
       .from("ai_agents")
@@ -336,12 +345,35 @@ export async function runWorkbenchStartJob(
           signal: abortController.signal,
         })
       : null);
+    const governedTurn = parentTurnAfterExperts(refinement ? null : collaboration);
+    if (governedTurn.kind === "govern") {
+      await commitWorkbenchGovernanceStop(pool, {
+        job,
+        workerId,
+        runId,
+        finalText: governedTurn.finalText,
+        errorCode: governedTurn.errorCode,
+        usage: {
+          inputTokens: collaboration?.usage.inputTokens ?? 0,
+          outputTokens: collaboration?.usage.outputTokens ?? 0,
+          costCents: collaboration?.usage.costCents ?? null,
+          calls: collaboration?.results.length ?? 0,
+        },
+      });
+      return;
+    }
     workbenchMcp = await buildMcpTurnTools(
       deps.crmCfg,
       { organizationId: job.organization_id, jobId: runId },
       modelAgentConfig,
       deps.log,
-      { readOnly: run.mode === "inspect", workbenchProposalTools: true },
+      {
+        readOnly: run.mode === "inspect",
+        workbenchProposalTools: true,
+        signal: abortController.signal,
+        ontologyPipelineIds,
+        workbenchRunId: runId,
+      },
     );
     const proposalInputs: Array<{ tool: string; arguments: unknown }> = [];
     const resultChannel = createWorkbenchResultChannel();
@@ -359,9 +391,29 @@ export async function runWorkbenchStartJob(
       gatedTools[name] = {
         ...(definition as object),
         execute: async (args: unknown, options: unknown) => {
-          if (effect.effect === "read") return original.execute!(args, options);
+          if (effect.effect === "read") {
+            const result = ontologyObjectScopeRefusal(name, scope) ?? await original.execute!(args, options);
+            if (name.startsWith("ontology_")) {
+              await beforeSideEffect();
+              await recordOntologyObservation(admin, { organizationId: job.organization_id, runId, tool: name, result });
+            }
+            return result;
+          }
           if (run.mode === "inspect") {
             return { content: "Blocked by inspect-only policy; no CRM state was changed.", isError: true };
+          }
+          const scopeRefusal = missionProposalScopeRefusal(
+            run.mission_id, scope.leadId, scope.contactId, scope.conversationId, name, args,
+          );
+          if (scopeRefusal) {
+            await beforeSideEffect();
+            await appendWorkbenchEvent(admin, {
+              organizationId: job.organization_id,
+              runId,
+              type: "policy_checked",
+              payload: { tool: name, gate: "mission_scope", verdict: "denied", code: "mission_target_mismatch" },
+            });
+            return scopeRefusal;
           }
           proposalInputs.push({ tool: name, arguments: args });
           return {

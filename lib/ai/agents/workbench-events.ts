@@ -45,7 +45,10 @@ const EVENT_FIELDS: Record<CrmAgentEventType, readonly string[]> = {
   policy_checked: ["proposalId", "decision", "tool", "gate", "verdict", "code",
     "round", "winnerChildRunId", "discardedChildRunIds", "candidates", "experienceCount"],
   tool_started: ["proposalId", "tool", "toolCallId"],
-  tool_completed: ["proposalId", "tool", "toolCallId", "status"],
+  tool_completed: [
+    "proposalId", "tool", "toolCallId", "status", "degraded", "assumption", "missing",
+    "receipt", "ontologyObservation", "terms", "version", "digest", "semantics",
+  ],
   crm_state_changed: ["proposalId", "tool", "targetId", "changedFields"],
   human_confirmation_requested: ["proposalId", "tool"],
   human_confirmation_received: ["proposalId", "decision", "actorUserId"],
@@ -66,7 +69,7 @@ const EVENT_FIELDS: Record<CrmAgentEventType, readonly string[]> = {
     "missingMaterialCount",
   ],
   specialist_failed: ["childRunId", "specialistKey", "code", "errorType"],
-  collaboration_conflict: ["code", "specialistKeys", "field"],
+  collaboration_conflict: ["code", "specialistKeys", "field", "governance", "writes", "unresolved"],
   collaboration_completed: [
     "planKey",
     "status",
@@ -74,12 +77,15 @@ const EVENT_FIELDS: Record<CrmAgentEventType, readonly string[]> = {
     "failedSpecialists",
     "toolCalls",
     "conflictCount",
+    "governance",
+    "writes",
+    "unresolved",
   ],
   manager_direction_consumed: ["directionId", "directionRevision"],
   usage_reported: ["inputTokens", "outputTokens", "costCents", "calls"],
 };
 
-/** Persist one redacted product event with a strictly increasing run sequence. */
+/** Persist one redacted product event with an atomic per-run sequence. */
 export async function appendWorkbenchEvent(
   admin: SupabaseClient,
   input: {
@@ -89,34 +95,28 @@ export async function appendWorkbenchEvent(
     payload?: Record<string, unknown>;
   },
 ): Promise<number> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data: last, error: readError } = await admin
-      .from("ai_agent_run_events")
-      .select("sequence")
-      .eq("organization_id", input.organizationId)
-      .eq("run_id", input.runId)
-      .order("sequence", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (readError) throw new Error(`workbench_event_read_failed:${readError.message}`);
-    const sequence = (last?.sequence ?? 0) + 1;
-    const { error } = await admin.from("ai_agent_run_events").insert({
-      organization_id: input.organizationId,
-      run_id: input.runId,
-      sequence,
-      event_type: input.type,
-      payload: redactEventPayload(input.type, input.payload ?? {}),
-    });
-    if (!error) {
-      if (["run_completed", "run_partial", "run_failed", "run_cancelled"].includes(input.type) &&
-          integrationBinding(input.organizationId, "langfuse")) {
-        try { await projectLangfuseRun(getRequestPool(), input.organizationId, input.runId); } catch { /* local event remains canonical */ }
-      }
-      return sequence;
-    }
-    if (error.code !== "23505") throw new Error(`workbench_event_append_failed:${error.message}`);
+  const { data, error } = await admin.rpc("fn_append_workbench_event", {
+    p_org: input.organizationId,
+    p_run: input.runId,
+    p_type: input.type,
+    p_payload: redactEventPayload(input.type, input.payload ?? {}),
+  });
+  if (error) throw new Error(`workbench_event_append_failed:${error.message}`);
+  if (typeof data !== "number" || !Number.isInteger(data) || data < 1)
+    throw new Error("workbench_event_sequence_invalid");
+  if (["run_completed", "run_partial", "run_failed", "run_cancelled"].includes(input.type)) {
+    await projectTerminalWorkbenchRun(input.organizationId, input.runId);
   }
-  throw new Error("workbench_event_sequence_race");
+  return data;
+}
+
+export async function projectTerminalWorkbenchRun(organizationId: string, runId: string) {
+  if (!integrationBinding(organizationId, "langfuse")) return;
+  try {
+    await projectLangfuseRun(getRequestPool(), organizationId, runId);
+  } catch {
+    // The committed workbench events remain canonical.
+  }
 }
 
 /** Events retain IDs and summaries, never credentials or raw message bodies. */

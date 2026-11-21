@@ -13,6 +13,7 @@ import { requestTurnDeps } from "@/lib/agent-engine/agent/request-deps";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { loadMemoryEvaluationRecalls } from "@/lib/ai/customer-memory/evaluation";
 import { BUILTIN_AGENTS } from "@/lib/ai/agents/builtins";
+import { EXPERT_CONFLICT_UNRESOLVED } from "@/lib/ai/agents/expert-conflict-governance";
 import { parseRuntimeMessages } from "@/lib/ai/agents/workbench-state";
 import type { AgentEvalReport, AgentEvalRunInput } from "@/lib/ai/evals/contracts";
 import { resolveAgentEvalProfile } from "@/lib/ai/evals/profiles";
@@ -81,7 +82,7 @@ async function loadEvaluationMaterial(
   const { data: run, error: runError } = await admin
     .from("ai_workbench_runs")
     .select(
-      "id, agent_id, task, mode, status, final_text, result_document, created_at, started_at, updated_at, runtime_state, scope",
+      "id, agent_id, task, mode, status, error_code, final_text, result_document, created_at, started_at, updated_at, runtime_state, scope",
     )
     .eq("organization_id", organizationId)
     .eq("id", runId)
@@ -161,7 +162,23 @@ async function loadEvaluationMaterial(
   const [{ data: childStates }, { data: childEvents }] = childMaterials;
   if ((childStates ?? []).some((child) => !parseRuntimeMessages(child.messages)))
     throw new EvaluationMaterialError("state_corrupt", "专家运行状态无法安全解析。");
-  if (!state && ["completed", "partial"].includes(run.status))
+  // An explicit governance stop precedes parent model execution. Require both
+  // durable events and no proposal or model decision before treating absence as expected.
+  const governedPreModelStop =
+    run.status === "partial" &&
+    run.error_code === EXPERT_CONFLICT_UNRESOLVED &&
+    !(proposals ?? []).length &&
+    (events ?? []).some((event) =>
+      event.event_type === "run_partial" &&
+      (event.payload as Record<string, unknown> | null)?.reason === EXPERT_CONFLICT_UNRESOLVED,
+    ) &&
+    (events ?? []).some((event) => {
+      const payload = event.payload as Record<string, unknown> | null;
+      return event.event_type === "collaboration_conflict" &&
+        payload?.writes === "stopped" && payload.unresolved === true;
+    }) &&
+    !(events ?? []).some((event) => event.event_type === "model_decision");
+  if (!state && ["completed", "partial"].includes(run.status) && !governedPreModelStop)
     throw new EvaluationMaterialError(
       "state_corrupt",
       "已结束运行缺少持久化模型观察，无法给出可信评分。",

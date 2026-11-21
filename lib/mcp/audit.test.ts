@@ -66,4 +66,25 @@ describe("auditMcpToolCall", () => {
     expect(e.metadata.args.cpf).toBe("[redacted]");
     expect(e.metadata.args.query).toBe("joana");
   });
+  it("records only semantic tool metadata in the audit entry", async () => {
+    await auditMcpToolCall({
+      ctx,
+      toolName: "ontology_query",
+      args: { question: "private question", assumption: { currency: "BRL" } },
+      durationMs: 1,
+      success: false,
+      errorMessage: "private question",
+      resultSummary: "private account",
+      motivo: "private reason",
+    });
+    expect(auditSpy.mock.calls[0]![0].metadata.args).toEqual({
+      question: "[redacted]",
+      has_assumption: true,
+    });
+    expect(auditSpy.mock.calls[0]![0].metadata).toMatchObject({
+      error: "ontology_tool_failure",
+      success: false,
+    });
+    expect(JSON.stringify(auditSpy.mock.calls[0]![0].metadata)).not.toContain("private");
+  });
 });

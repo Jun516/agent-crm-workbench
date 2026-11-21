@@ -257,7 +257,11 @@ export async function POST(req: NextRequest): Promise<Response> {
     actor_user_id: user.id,
     task: parsed.data.task,
     mode: parsed.data.mode,
-    scope: (parsed.data.scope ?? {}) as never,
+    scope: {
+      ...(parsed.data.scope ?? {}),
+      ...(resolvedScope.contactId ? { contactId: resolvedScope.contactId } : {}),
+      ...(resolvedScope.pipelineId ? { pipelineId: resolvedScope.pipelineId } : {}),
+    } as never,
     status: "queued",
     budget: budget as never,
     runtime_state: {

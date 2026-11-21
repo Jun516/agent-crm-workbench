@@ -59,6 +59,25 @@ describe("Mission customer-send commands", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("returns the same paused policy when the request key is replayed", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ result: {
+      result: "replayed", paused: true, revision: 1, commandId: 8,
+    } }] });
+    vi.mocked(getRequestPool).mockReturnValue({ query } as never);
+    const { POST } = await import("./route");
+    const response = await POST(request(), { params: Promise.resolve({ id: MISSION }) });
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({
+      missionId: MISSION,
+      customerSendPaused: true,
+      policyRevision: 1,
+      commandId: 8,
+      replayed: true,
+      changed: false,
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it("reports idempotency-key conflicts rather than mutating policy", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ result: { result: "source_conflict" } }] });
     vi.mocked(getRequestPool).mockReturnValue({ query } as never);

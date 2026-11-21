@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
       .order("created_at", { ascending: true }),
     run.mission_id
       ? admin.from("ai_missions")
-          .select("id, lead_id, goal, acceptance_criteria, acceptance_contract, customer_send_paused, send_policy_revision, status, blocked_reason, resolution_reason, max_runs, max_total_tokens, max_total_cost_cents, deadline_at, wake_on_customer_reply, created_at, updated_at")
+          .select("id, lead_id, goal, acceptance_criteria, current_direction, direction_revision, direction_consumed_revision, acceptance_contract, customer_send_paused, send_policy_revision, status, blocked_reason, resolution_reason, max_runs, max_total_tokens, max_total_cost_cents, deadline_at, wake_on_customer_reply, created_at, updated_at")
           .eq("organization_id", authz.org.orgId).eq("id", run.mission_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);

@@ -10075,6 +10075,28 @@ export type Database = {
       };
     };
     Functions: {
+      fn_append_workbench_event: {
+        Args: { p_org: string; p_payload: Json; p_run: string; p_type: string };
+        Returns: number;
+      };
+      fn_ai_memory_schedule_night: {
+        Args: { p_after?: string; p_contact: string; p_org: string };
+        Returns: string;
+      };
+      fn_ai_memory_emit_extract: {
+        Args: {
+          p_contact: string;
+          p_conversation: string;
+          p_key?: string;
+          p_not_before?: string;
+          p_org: string;
+          p_revision: number;
+          p_run?: string;
+          p_source: string;
+          p_until: string;
+        };
+        Returns: string;
+      };
       fn_channel_routing_claim: {
         Args: {
           p_channel: string;

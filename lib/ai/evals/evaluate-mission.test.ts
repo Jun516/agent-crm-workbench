@@ -48,6 +48,14 @@ const base: MissionEvalInput = {
 };
 
 describe("mission outcome evaluation", () => {
+  it("treats an executed non-lead-update change as unverified, while mismatched events remain conflicts", () => {
+    const proposal = { id: "tag-1", runId: "run-1", toolName: "crm_manage_tags", status: "executed" };
+    const event = { runId: "run-1", sequence: 1, eventType: "crm_state_changed", payload: { proposalId: "tag-1", tool: "crm_manage_tags" } };
+    const report = evaluateMission({ ...base, proposals: [proposal], events: [event] });
+    expect(report.summary).toMatchObject({ crmChangesObserved: 0, crmChangesUnverified: 1, crmChangeEvidenceConflicts: 0 });
+    expect(evaluateMission({ ...base, proposals: [proposal], events: [{ ...event, payload: { ...event.payload, tool: "other" } }] }).summary.crmChangeEvidenceConflicts).toBe(1);
+  });
+
   it("reports authenticated quote terms separately from full business acceptance", () => {
     const report = evaluateMission({
       ...base,

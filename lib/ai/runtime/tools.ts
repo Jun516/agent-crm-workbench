@@ -69,7 +69,7 @@ function wrapMcpTool(def: McpToolDefinition, input: PickToolsInput): Tool {
   const wrapped = tool({
     description: def.description,
     inputSchema,
-    execute: async (args: unknown) => {
+    execute: async (args: unknown, options) => {
       const startedAt = Date.now();
       // ── O UUID QUE O MODELO INVENTA PARA "NÃO SEI" ────────────────────────
       //
@@ -175,7 +175,17 @@ function wrapMcpTool(def: McpToolDefinition, input: PickToolsInput): Tool {
           return { permitido: false, motivo: veredito.motivo, mensagem: explicacao };
         }
 
-        const result = await def.handler(argsRecord as never, input.ctx);
+        let context = input.ctx;
+        const ontologyRuntime = context.ontologyRuntime;
+        if (ontologyRuntime && def.name.startsWith("ontology_")) {
+          const requestSignal = options?.abortSignal;
+          const runSignal = ontologyRuntime.signal;
+          const signal = requestSignal && runSignal
+            ? AbortSignal.any([requestSignal, runSignal])
+            : requestSignal ?? runSignal;
+          context = { ...context, ontologyRuntime: { ...ontologyRuntime, signal } };
+        }
+        const result = await def.handler(argsRecord as never, context);
 
         // Capture handoff signal so the runtime can short-circuit the loop.
         if (def.name === HANDOFF_TOOL_NAME) {
@@ -239,6 +249,18 @@ function wrapMcpTool(def: McpToolDefinition, input: PickToolsInput): Tool {
         // — o modelo não tinha como saber que o papel era DELE, não do leitor. A
         // mensagem original continua no log e na observabilidade acima, onde
         // serve; para o modelo vai uma instrução que já sabe o que é.
+        if (def.name.startsWith("ontology_")) {
+          return {
+            kind: "ontology_observation",
+            status: "unanswerable",
+            degraded: true,
+            missing: [
+              err instanceof McpAuthError
+                ? "Acesso semântico recusado."
+                : "Serviço semântico indisponível.",
+            ],
+          };
+        }
         if (err instanceof McpAuthError) {
           return { error: recusaDeCapacidadeParaOModelo(def.name) };
         }

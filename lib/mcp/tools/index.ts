@@ -10,6 +10,7 @@
  *  `apenasHumano` no catálogo — nunca alcançável pelo agente publicado).
  */
 import type { McpToolDefinition } from "../types";
+import { ontologySearchTerms, ontologyCheckAnswerable, ontologyQuery, ontologyDescribeAction, ontologyDescribeOutcome } from "./ontology";
 import { TOOL_CATALOG, VALID_TOOL_IDS } from "./catalog";
 import { crmSearchContacts, crmGetContact, crmProposeContactField } from "./contacts";
 import {
@@ -95,6 +96,7 @@ import {
 // unknown>` e cada handler valida no Zod do registerTool.
 export const allTools: ReadonlyArray<McpToolDefinition> = [
   // read
+  ontologySearchTerms, ontologyCheckAnswerable, ontologyQuery, ontologyDescribeAction, ontologyDescribeOutcome,
   crmListEventTypes,
   crmFindFreeSlots,
   crmListAppointments,

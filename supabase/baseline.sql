@@ -38310,6 +38310,96 @@ create unique index if not exists ai_customer_memory_usage_request_idx on public
 create unique index if not exists ai_customer_memory_usage_legacy_idx on public.ai_customer_memory_usage(organization_id,run_id,memory_id) where recall_id is null;
 notify pgrst,'reload schema';
 
+-- Narrow, non-login role for ontology templates. Authentication/token lookup
+-- occurs before SET LOCAL ROLE; the data query itself has no write privilege.
+do $ontology_role$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'ontology_reader') then
+    create role ontology_reader nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'ontology_reader'
+      and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole or rolbypassrls or rolinherit))
+    or exists (select 1 from pg_auth_members m join pg_roles r on r.oid=m.member
+      where r.rolname='ontology_reader') then
+    raise exception 'ontology_reader role is not restricted';
+  end if;
+  -- PostgreSQL 16+ separates membership from permission to SET ROLE.
+  -- A redundant GRANT requires ADMIN OPTION on PostgreSQL 17.
+  if not pg_has_role(current_user, 'ontology_reader',
+      case when current_setting('server_version_num')::int >= 160000 then 'SET' else 'MEMBER' end) then
+    begin
+      execute format('grant ontology_reader to %I', current_user);
+    exception when insufficient_privilege then
+      raise exception 'ontology_reader bootstrap requires ADMIN OPTION or an existing SET-capable membership'
+        using errcode = '42501', hint = 'Ask a role administrator to grant ontology_reader to the schema role.';
+    end;
+  end if;
+end
+$ontology_role$;
+
+grant usage on schema public, auth to ontology_reader;
+grant execute on function auth.uid(), auth.jwt() to ontology_reader;
+grant execute on function public.fn_user_org_ids(), public.fn_user_role_in_org(uuid),
+  public.fn_is_platform_admin(), public.fn_can_view_lead(uuid,uuid),
+  public.fn_role_at_least(uuid,text) to ontology_reader;
+grant select (id, organization_id, status, value_cents, currency, pipeline_id, owner_user_id)
+  on public.crm_leads to ontology_reader;
+grant select (id, organization_id, lead_id, contact_id, status, due_date)
+  on public.crm_tasks to ontology_reader;
+grant select (id, organization_id) on public.contacts to ontology_reader;
+grant select (organization_id, lead_id, type, performed_at)
+  on public.crm_lead_activities to ontology_reader;
+grant select (id, settings) on public.organizations to ontology_reader;
+
+
+-- Serialize sequence allocation with the run row already locked by Mission
+-- cancellation and approval transactions. Only the trusted service may append.
+create or replace function public.fn_append_workbench_event(
+  p_org uuid, p_run uuid, p_type text, p_payload jsonb
+) returns integer
+language plpgsql security definer set search_path = public
+as $$
+declare v_sequence integer;
+begin
+  perform 1 from public.ai_workbench_runs
+    where organization_id = p_org and id = p_run for update;
+  if not found then raise exception 'workbench_run_not_found'; end if;
+  insert into public.ai_agent_run_events (organization_id, run_id, sequence, event_type, payload)
+    select p_org, p_run, coalesce(max(sequence), 0) + 1, p_type, p_payload
+    from public.ai_agent_run_events where organization_id = p_org and run_id = p_run
+    returning sequence into v_sequence;
+  return v_sequence;
+end;
+$$;
+revoke all on function public.fn_append_workbench_event(uuid,uuid,text,jsonb) from public, anon, authenticated;
+grant execute on function public.fn_append_workbench_event(uuid,uuid,text,jsonb) to service_role;
+
+-- Make ontology role bootstrap safe to replay on PostgreSQL 16 and later.
+do $ontology_role$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'ontology_reader') then
+    create role ontology_reader nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'ontology_reader'
+      and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole or rolbypassrls or rolinherit))
+    or exists (select 1 from pg_auth_members m join pg_roles r on r.oid=m.member
+      where r.rolname='ontology_reader') then
+    raise exception 'ontology_reader role is not restricted';
+  end if;
+  -- PostgreSQL 16+ separates membership from permission to SET ROLE.
+  -- A redundant GRANT requires ADMIN OPTION on PostgreSQL 17.
+  if not pg_has_role(current_user, 'ontology_reader',
+      case when current_setting('server_version_num')::int >= 160000 then 'SET' else 'MEMBER' end) then
+    begin
+      execute format('grant ontology_reader to %I', current_user);
+    exception when insufficient_privilege then
+      raise exception 'ontology_reader bootstrap requires ADMIN OPTION or an existing SET-capable membership'
+        using errcode = '42501', hint = 'Ask a role administrator to grant ontology_reader to the schema role.';
+    end;
+  end if;
+end
+$ontology_role$;
+
 -- ---- VARREDURA anon: fecha os apêndices posteriores à migration 0116 ----
 -- O bloco original 0116 precede as migrations acrescentadas ao baseline ao
 -- longo do tempo. Reaplicar a mesma cura no fim mantém seguro também o caminho

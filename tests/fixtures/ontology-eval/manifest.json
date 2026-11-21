@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "seed": 36,
+  "fixture_files_sha256": {
+    "questions.json": "7a68de69d60ebb370a3bef7b31e9a956c9e212ee8a75d10fe8ddd2905138542a",
+    "seed.sql": "f2bea43adec7ab6db795fb4bebcd10b290033c13eb1e3f665a253035ff5fe6e4",
+    "oracle.sql": "2f173aaba29fcd1ec35889dae105dad8bdcbde0356682615381c02f13604f72e",
+    "sql-expected.json": "38096bc70b0f5ce735aac5e6025c3210abbc2c78726438ca1f3714ef4b00ced8",
+    "rubric.json": "ecf920f726be9e0e24c38248308d20e002c1aaabf63a2f047d8e4335323dbdcf",
+    "negative-controls.sql": "35c7d55ab7275394e6947e7a943646f1d231340721cbfce8f3dbd30d5664e172"
+  }
+}
