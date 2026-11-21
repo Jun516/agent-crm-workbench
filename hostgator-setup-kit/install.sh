@@ -1854,6 +1854,12 @@ if [ -f supabase/baseline.sql ]; then
     fi
   fi
 
+  if provisionar_leitura_ontology; then
+    c_grn "✓ leitura semântica recebeu role restrita"
+  else
+    c_ylw "⚠ leitura semântica indisponível: não foi possível conceder sua role restrita. Confira as conexões de app e administração e repita a instalação."
+  fi
+
   # Verificação real, não wishful thinking: o app precisa das tabelas core.
   n_tables="$(docker run --rm postgres:17-alpine psql "$(url_do_schema)" -tAc \
     "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null | tr -d '[:space:]')"
