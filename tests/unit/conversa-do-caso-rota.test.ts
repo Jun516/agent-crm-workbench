@@ -27,6 +27,8 @@ import { fail } from "@/lib/api/wrappers";
 import { ROLE_RANK, type AuthUser, type Role } from "@/lib/auth/types";
 import { LlmNotConfiguredError } from "@/lib/agent-engine/edge/llm/run-model-call";
 
+const turnRuntime = vi.hoisted(() => ({ runTurn: vi.fn() }));
+
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -38,7 +40,7 @@ vi.mock("@/lib/agent-engine/agent/conversa-do-caso", () => ({
   responderSobreOCaso: vi.fn(),
 }));
 vi.mock("@/lib/agent-engine/agent/request-deps", () => ({
-  requestTurnDeps: () => ({ llmCfg: { anthropicApiKey: "k" }, log: undefined, registry: undefined }),
+  requestTurnDeps: () => ({ llmCfg: { anthropicApiKey: "k" }, log: undefined, runtime: turnRuntime }),
 }));
 vi.mock("@/lib/agent-engine/agent/conversa-do-caso/persona", async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -274,6 +276,7 @@ describe("POST — o caminho feliz e a falha do modelo", () => {
     const r = await POST(pedido(CORPO_OK), { params: Promise.resolve({ id: CASE_ID }) });
     expect(r.status).toBe(200);
     expect(responderSobreOCaso).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(responderSobreOCaso).mock.calls[0]?.[3]?.runtime).toBe(turnRuntime);
     const inserts = pool.queries.filter((q) => /insert into agent_case_chat_messages/.test(q.sql));
     expect(inserts).toHaveLength(2);
     expect(inserts[0]!.sql).toContain("'human'");
