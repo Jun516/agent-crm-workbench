@@ -288,7 +288,7 @@ export class PiAgentRuntime implements AgentRuntime {
       !input.contextProbe.id.trim() || input.contextProbe.id.length > 200 ||
       !input.contextProbe.userText.trim() || input.contextProbe.userText.length > 20_000
     )) throw new Error("pi_context_probe_invalid");
-    const [{ Agent }, { Type }, resolved] = await Promise.all([
+    const [{ Agent }, { Type, toToolDeclaration }, resolved] = await Promise.all([
       loadPiAgentCore(),
       loadPiAi(),
       this.resolveModel(input.model),
@@ -402,6 +402,7 @@ export class PiAgentRuntime implements AgentRuntime {
       };
     });
 
+    const toolDeclarations = input.transformContext ? tools.map(toToolDeclaration) : [];
     const history = input.messages?.map((message) => messageToPi(message, input.model));
     if (history?.[0]?.role === "system") {
       // Pi gives a replayed leading system message precedence over systemPrompt.
@@ -428,7 +429,24 @@ export class PiAgentRuntime implements AgentRuntime {
           }),
           signal,
         );
-        return next.map((message) => messageToPi(message, input.model));
+        const transformed = next.map((message) => messageToPi(message, input.model));
+        if (toolDeclarations.length === 0) return transformed;
+
+        // Pi 1.3 obtains tools from system messages. The CRM transform only
+        // handles message content; restore declarations from this run's
+        // executable registry without restoring any filtered system text.
+        const first = transformed[0];
+        if (first?.role === "system") {
+          transformed[0] = { ...first, toolsAdded: toolDeclarations };
+        } else {
+          transformed.unshift({
+            role: "system",
+            content: "",
+            timestamp: now(),
+            toolsAdded: toolDeclarations,
+          });
+        }
+        return transformed;
       },
       convertToLlm: (messages) => {
         const modelMessages = messages.filter(

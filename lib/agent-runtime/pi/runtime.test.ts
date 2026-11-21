@@ -1,4 +1,4 @@
-import type { RuntimeObservation } from "../types";
+import type { RuntimeMessage, RuntimeObservation } from "../types";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -844,6 +844,55 @@ describe("PiAgentRuntime", () => {
       expect.arrayContaining([expect.objectContaining({ content: "previous CRM context" })]),
     );
   });
+
+  it.each(["rewrite", "remove"] as const)(
+    "keeps current tool declarations when a CRM context transform can %s the system text",
+    async (action) => {
+      const execute = vi.fn(async () => ({ content: "verified customer record" }));
+      const observeProvider = vi.fn((context: Parameters<typeof getCurrentTools>[0]) => {
+        expect(getCurrentSystemPrompt(context)).toBe(
+          action === "rewrite" ? "Current customer context" : "",
+        );
+        expect(getCurrentTools(context)).toEqual([{
+          name: "lookup_customer",
+          description: "Read the current customer record",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+        }]);
+      });
+      const { runtime } = runtimeWithFaux([
+        ({ messages }) => {
+          observeProvider(messages);
+          return fauxAssistantMessage(fauxToolCall("lookup_customer", {}), { stopReason: "toolUse" });
+        },
+        ({ messages }) => {
+          observeProvider(messages);
+          return fauxAssistantMessage("verified");
+        },
+      ]);
+
+      const result = await runtime.run({
+        systemPrompt: "Previous customer context",
+        prompt: "Check the customer record",
+        model,
+        maxTurns: 2,
+        tools: [{
+          name: "lookup_customer",
+          description: "Read the current customer record",
+          capability: "read",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          execute,
+        }],
+        transformContext: (messages) => messages.flatMap<RuntimeMessage>((message) => {
+          if (message.role !== "system") return [{ ...message }];
+          return action === "rewrite" ? [{ ...message, content: "Current customer context" }] : [];
+        }),
+      });
+
+      expect(observeProvider).toHaveBeenCalledTimes(2);
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.text).toBe("verified");
+    },
+  );
 
   it("rejects before opening the provider when the caller is already aborted", async () => {
     const { runtime } = runtimeWithFaux([fauxAssistantMessage("must not run")]);
