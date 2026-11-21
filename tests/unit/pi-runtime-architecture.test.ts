@@ -18,8 +18,13 @@ describe("Pi runtime architecture boundary", () => {
   it("keeps direct Pi SDK imports inside the Pi adapter directory", () => {
     const offenders = sourceFiles.filter((relativePath) => {
       const source = readFileSync(`${ROOT}/${relativePath}`, "utf8");
+      // Package names in Next's literal build configuration do not load the SDK.
+      const inspected =
+        relativePath === "next.config.ts"
+          ? source.replace(/^[ \t]*serverExternalPackages:\s*\[\s*(?:["'][\w@\/-]+["']\s*,?\s*)*\],?/m, "")
+          : source;
       return (
-        /@earendil-works\/pi-(?:agent-core|ai)/.test(source) &&
+        /@earendil-works\/pi-(?:agent-core|ai)/.test(inspected) &&
         !relativePath.startsWith("lib/agent-runtime/pi/") &&
         !relativePath.startsWith("tests/agent-runtime/fixtures/")
       );
