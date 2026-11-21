@@ -186,10 +186,11 @@ test.describe("acervo de conhecimento", () => {
     // como "pulado", que se lê igual a "não se aplica aqui". Cobertura parcial
     // silenciosa é o modo de falha que este repo mais persegue, e foi medido
     // exatamente assim nesta bateria.
-    const semChaveLoc = page.getByTestId("conhecimento-sem-chave");
+    const workspace = page.getByRole("main");
+    const semChaveLoc = workspace.getByTestId("conhecimento-sem-chave");
     await expect(
-      semChaveLoc.or(page.getByTestId("conhecimento-chave-ok")).or(
-        page.getByTestId("conhecimento-chave-conferindo"),
+      semChaveLoc.or(workspace.getByTestId("conhecimento-chave-ok")).or(
+        workspace.getByTestId("conhecimento-chave-conferindo"),
       ),
     ).toBeVisible({ timeout: 30_000 });
 

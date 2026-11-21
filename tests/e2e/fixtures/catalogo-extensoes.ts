@@ -144,6 +144,7 @@ export async function criarAtoresDasExtensoes(): Promise<AtoresDasExtensoes> {
         email,
         password: senha,
         email_confirm: true,
+        user_metadata: { locale: "pt-BR" },
       });
       if (error || !data.user) throw new Error(error?.message ?? `Usuário ${papel} ausente.`);
       usuarios[papel] = { id: data.user.id, email };

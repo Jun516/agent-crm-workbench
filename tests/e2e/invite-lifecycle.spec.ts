@@ -175,7 +175,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await mctx.close();
   });
 
-  test("1. ciclo feliz: convidar → aceitar → vira agent → cai no inbox", async ({ browser }) => {
+  test("1. ciclo feliz: convidar → aceitar → vira agent → cai na página inicial", async ({ browser }) => {
     // admin convida
     const adminCtx = await browser.newContext();
     const adminPage = await adminCtx.newPage();
@@ -206,7 +206,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await page.goto(tokenPath(acceptUrl));
     await expect(page.getByRole("heading", { name: /Aceitar convite/i })).toBeVisible();
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
 
     // depois do aceite: membership agent criada
     expect(await membershipCount()).toBe(1);
@@ -256,11 +256,11 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     // 1º aceite (reaplica)
     await page.goto(`/team/accept-invite/${token}`);
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
     // 2º aceite do MESMO token
     await page.goto(`/team/accept-invite/${token}`);
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
     // sem duplicar membership
     expect(await membershipCount()).toBe(1);
     await ctx.close();

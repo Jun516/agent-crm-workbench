@@ -91,7 +91,7 @@ test("chego nos tipos CLICANDO no menu, e a lista mostra o que existe", async ({
   await item.click();
 
   await expect(page).toHaveURL(/\/app\/settings\/tenant\/agenda/, { timeout: 20_000 });
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible();
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible();
   await expect(
     page.getByTestId("lista-de-tipos").getByRole("listitem").first(),
     "a lista veio vazia — a organização de teste tem tipos semeados",
@@ -102,7 +102,7 @@ test("crio um tipo COM responsável, e ele passa a ser marcável na Agenda", asy
   const creds = lerCreds();
   await entrar(page, creds);
   await page.goto("/app/settings/tenant/agenda");
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
 
   // Nome único por execução: a rota recusa slug repetido com 409, e uma spec que
   // só passa na primeira execução é pior que spec nenhuma.
@@ -133,7 +133,7 @@ test("crio um tipo COM responsável, e ele passa a ser marcável na Agenda", asy
 
   // ── O laço: o tipo novo chega na tela de marcar ───────────────────────
   await page.goto("/app/agenda");
-  await expect(page.getByTestId("tela-agenda")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tela-agenda")).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: /novo agendamento/i }).click();
   await expect(page.getByTestId("tipos-de-agendamento")).toBeVisible({ timeout: 15_000 });
   await expect(
@@ -168,7 +168,7 @@ test("o tipo NASCE com responsável — e quem escolhe 'Definir depois' recebe a
   const creds = lerCreds();
   await entrar(page, creds);
   await page.goto("/app/settings/tenant/agenda");
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
 
   // ── METADE A: sem tocar no seletor, o tipo nasce COM dono ──────────────────
   const comDono = `Nasce Com Dono E2E ${Date.now().toString().slice(-6)}`;
@@ -256,7 +256,7 @@ test("desativar tira o tipo da tela de marcar, e reativar o traz de volta", asyn
   const creds = lerCreds();
   await entrar(page, creds);
   await page.goto("/app/settings/tenant/agenda");
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
 
   const nome = `Temporario E2E ${Date.now().toString().slice(-6)}`;
   await page.getByTestId("abrir-novo-tipo").click();
@@ -295,7 +295,7 @@ test("desativar tira o tipo da tela de marcar, e reativar o traz de volta", asyn
   // continua ocupado pelo tipo desligado (o slug é único), então quem errou o
   // clique não consegue nem recriar com o mesmo nome.
   await page.goto("/app/settings/tenant/agenda");
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
   await linha.getByRole("button", { name: "Reativar" }).click();
 
   await expect(
@@ -334,7 +334,7 @@ test("ligo o aviso do compromisso pela tela, e ele fica ligado", async ({ page }
   const creds = lerCreds();
   await entrar(page, creds);
   await page.goto("/app/settings/tenant/agenda");
-  await expect(page.getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main").getByTestId("tipos-de-agendamento-config")).toBeVisible({ timeout: 20_000 });
 
   const nome = `Lembrete E2E ${Date.now().toString().slice(-6)}`;
   await page.getByTestId("abrir-novo-tipo").click();
