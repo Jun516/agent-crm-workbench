@@ -18,6 +18,7 @@
 | [Jev 使用说明](docs/ke-ying/jev-review.md) | 配置、显式外送确认、分流策略和验证边界 |
 | [知识与 Memory 边界](docs/ke-ying/memory-knowledge-boundaries.md) | 当前事实、授权读取和低权威历史材料 |
 | [开发配置](docs/SETUP.md) | Supabase、模型凭据和本地运行 |
+| [合并升级的验证流程](docs/testing/verify-crm.md) | 数据库升级、本机自动验收与测试范围 |
 
 本仓库增量已进行本地离线回归；跨境行业是示例背景，不表示真实客户上线或业务收益。新增自精炼及 Jev 链路尚未完成真实模型、真实渠道和生产端到端验收；阈值与覆盖评分不是业务准确率。下方保留的历史工程/联调记录应按其日期和原测量范围理解，不作为本仓库新增功能的验收结论。公开源码不附带未经逐项审阅的本地运行截图、客户数据、凭据或数据库备份。
 
@@ -183,11 +184,14 @@ node scripts/serve-agent-demo.mjs
 | `pnpm test:unit`                 | 单元测试                     |
 | `pnpm test:db`                   | 数据库不变量与隔离检查       |
 | `pnpm test:e2e`                  | 浏览器测试                   |
+| `pnpm verify:crm`                | 工作台与 Mission 本机端到端核验 |
 | `pnpm test:e2e:acceptance`       | 专项验收测试                 |
 | `pnpm test:e2e:live`             | 真实模型场景测试             |
 | `pnpm build`                     | 构建应用                     |
 
 ## 项目状态
+
+合并升级接入了客户记忆的候选确认、有效期和使用回执，Ontology 只读查询，专家冲突转人工，Mission 方向控制与发送暂停，以及支持系统减弱动态效果设置的工作台动效。四项定制继续由原有入口控制。部署前请核对 [数据库升级顺序](docs/testing/verify-crm.md#数据库升级) 与 [待办](BACKLOG.md)。
 
 当前为内部研发版本，主分支围绕 Agent 工作台、受控 CRM 工具、多 Agent 协作、商机 Mission、知识记忆和 Eval 持续迭代。
 

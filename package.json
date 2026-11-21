@@ -21,6 +21,7 @@
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:reset": "supabase db reset",
     "test:e2e": "playwright test",
+    "verify:crm": "playwright test tests/e2e/agent-workbench-ontology.spec.ts --workers=1 --retries=0",
     "test:e2e:acceptance": "playwright test --config tests/e2e/configs/acceptance.config.ts",
     "test:e2e:live": "playwright test --config tests/e2e/configs/live.config.ts",
     "e2e:build": "bash scripts/e2e-build.sh",

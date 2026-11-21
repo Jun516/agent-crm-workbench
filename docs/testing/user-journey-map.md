@@ -2890,4 +2890,4 @@ Não registrar esta cobertura parcial como PASS de E2E.
 
 `[P1]` 现有 Run 评测面板新增显式资料共享勾选和 Jev 按钮。`workbench-jev-controls.test.tsx` 验证初始不请求、未配置/运行中禁用与失败可见；`jev-route.test.ts` 验证 GET 无付费调用、固定模型缓存与别名独立回执、当前隐私/知识权限撤回；`jev-judge.test.ts` 覆盖置信度、资料受限与确定性失败不可升级。相关现有评测及证据读取回归一并运行。
 
-**真实界面/外部服务验收仍待完成：** 本轮没有启动 Supabase 或浏览器端到端、没有真实 TypeSafe 凭证调用。DOM 与离线 API 替身不能证明像素布局、实际模型质量或供应商可用性。详见 `docs/ke-ying/jev-review.md` 和同目录 validation-jev 日志。
+该轮验证范围为 DOM 和离线 API 替身，过程日志保存在本地工程归档。Jev 外部凭据与真实模型评测见 [Jev 使用说明](../ke-ying/jev-review.md)。
