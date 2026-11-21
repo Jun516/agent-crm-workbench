@@ -505,14 +505,13 @@ export function AgentCrmWorkbench({
     initialStatus: string,
   ) => {
     let sequence = initialEvents.reduce((max, event) => Math.max(max, event.sequence), 0);
+    const terminalStatuses = ["completed", "partial", "failed", "cancelled"];
     // The worker can finish before the first detail request reaches the browser.
     // In that case the initial event page already contains the terminal event;
     // starting the stream at its last sequence would otherwise wait forever for
     // a terminal event that has intentionally been skipped during replay.
     let status = initialStatus;
-    while (
-      !["completed", "partial", "failed", "cancelled", "awaiting_confirmation"].includes(status)
-    ) {
+    while (!terminalStatuses.includes(status) && status !== "awaiting_confirmation") {
       const response = await fetch(`/api/v1/ai/workbench/runs/${runId}/events?after=${sequence}`);
       if (!response.ok || !response.body) return;
       const reader = response.body.getReader();
@@ -532,14 +531,12 @@ export function AgentCrmWorkbench({
             if (!event.sequence || event.sequence <= sequence) continue;
             sequence = event.sequence;
             const eventStatus = statusFromWorkbenchEvent(event.event_type);
-            if (eventStatus) status = eventStatus;
+            if (eventStatus && !terminalStatuses.includes(status)) status = eventStatus;
             setDetail((current) => {
               if (current?.id !== runId) return current;
               // A cancellation/detail read may already have observed a terminal
               // state while an older stream chunk was in flight. Never revive it.
-              const terminal = ["completed", "partial", "failed", "cancelled"].includes(
-                current.status,
-              );
+              const terminal = terminalStatuses.includes(current.status);
               return {
                 ...current,
                 ...(!terminal && eventStatus ? { status: eventStatus } : {}),

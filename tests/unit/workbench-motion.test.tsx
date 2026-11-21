@@ -499,6 +499,10 @@ describe("server-driven workbench status", () => {
       records.get("run-1")!.status = terminal;
       await act(async () => stream!.close());
       expect(screen.getByRole("status")).toHaveTextContent(`运行状态：${terminal}`);
+      // The final detail read still runs, but the stale event must not force another poll.
+      expect(reads.filter((url) => url === "/api/v1/ai/workbench/runs/run-1")).toHaveLength(
+        readCount + 1,
+      );
     },
   );
 

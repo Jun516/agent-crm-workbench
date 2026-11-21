@@ -50,6 +50,9 @@ createRoot(document.getElementById('root')!).render(
 
 // Runs in the browser before React. This transport never reaches an API server.
 function installFixtures() {
+  // Vite serves this fixture outside Next.js. Give next/link its optional
+  // build-time flags without reading the host process environment.
+  globalThis.process ??= { env: {} };
   const records = new Map();
   const streams = new Map();
   const requests = [];
@@ -422,7 +425,7 @@ try {
       return route.abort("blockedbyclient");
     });
     const page = await context.newPage();
-    page.on("pageerror", (error) => report.consoleErrors.push(String(error)));
+    page.on("pageerror", (error) => report.consoleErrors.push(String(error.stack ?? error)));
     page.on("console", (msg) => {
       if (msg.type() === "error") report.consoleErrors.push(msg.text());
     });
