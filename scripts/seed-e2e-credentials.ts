@@ -149,17 +149,19 @@ async function ensureUser(email: string, full_name: string): Promise<string> {
   // listUsers paginado — perPage default 50; nosso pool é pequeno
   const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
   const existing = list.users.find((u) => u.email === email);
+  const user_metadata = { full_name, locale: "pt-BR" };
   if (existing) {
     console.log(`[seed] user existing ${email}: ${existing.id}`);
-    // garantir senha conhecida
-    await admin.auth.admin.updateUserById(existing.id, { password: PASSWORD });
+    // Keep the synthetic user's login and UI language deterministic on re-seed.
+    const { error } = await admin.auth.admin.updateUserById(existing.id, { password: PASSWORD, user_metadata });
+    if (error) throw new Error(`update user ${email}: ${error.message}`);
     return existing.id;
   }
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password: PASSWORD,
     email_confirm: true,
-    user_metadata: { full_name },
+    user_metadata,
   });
   if (error || !data?.user) throw new Error(`create user ${email}: ${error?.message}`);
   console.log(`[seed] user created ${email}: ${data.user.id}`);
