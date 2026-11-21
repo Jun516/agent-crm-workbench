@@ -420,9 +420,13 @@ test.describe("QA — o agente usa as mãos que a W4 entregou?", () => {
     await login(page);
 
     const agentesRes = await page.request.get(`${APP_URL}/api/v1/ai/agents`);
-    const agentes = (await agentesRes.json()) as { data?: Array<{ id: string; name: string }> };
-    const agenteId = agentes.data?.[0]?.id;
-    expect(agenteId, "a org de E2E precisa de um agente").toBeTruthy();
+    const agentes = (await agentesRes.json()) as {
+      data?: Array<{ id: string; name: string; origin: string }>;
+    };
+    const agenteId = agentes.data?.find((agente) =>
+      agente.name === "Bot Padrão E2E" && agente.origin !== "builtin",
+    )?.id;
+    expect(agenteId, "a org de E2E precisa do agente editável semeado").toBeTruthy();
 
     const versaoId = await versaoComAsCapacidades(page.request, agenteId!);
     console.info(`[QA] versão de teste ${versaoId} com ${CAPACIDADES.length} capacidades`);

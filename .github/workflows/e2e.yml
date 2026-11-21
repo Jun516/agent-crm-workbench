@@ -952,7 +952,6 @@ jobs:
         passagem-com-contexto.spec.ts
         interface-por-vinculo.spec.ts
         pipelines-gestao.spec.ts
-        qa-agente-usa-as-maos.spec.ts
         qa-selo-no-funil-usado.spec.ts
         qa-telas-descobertas-w4.spec.ts
         retorno-anti-morte.spec.ts
@@ -1085,6 +1084,8 @@ jobs:
       # Esta spec também usa o provider real da organização de demonstração
       # para validar submissão estruturada e assertivas de campos do CRM; o CI
       # compartilhado não deve chamá-lo nem gastar credenciais externas.
+      # qa-agente-usa-as-maos mede a escolha de ferramentas por um provedor real
+      # e usa crédito externo. A stub do CI não mede esse comportamento.
       # customer-memory-loop usa a pilha local WAHA e Redis e o usuário
       # criado pelo bootstrap do cenário especializado de memória.
       # agent-workbench-ontology usa um worker ativo e um provedor local determinístico.
@@ -1097,6 +1098,7 @@ jobs:
         agent-multi-agent-eval-real-model.spec.ts
         agent-semantic-judge-real-model.spec.ts
         agent-workbench-structured-result-real-model.spec.ts
+        qa-agente-usa-as-maos.spec.ts
         customer-memory-loop.spec.ts
         agent-workbench-ontology.spec.ts
     steps:
