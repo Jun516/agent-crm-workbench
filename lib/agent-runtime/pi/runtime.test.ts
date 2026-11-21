@@ -890,7 +890,7 @@ describe("PiAgentRuntime", () => {
 
       expect(observeProvider).toHaveBeenCalledTimes(2);
       expect(execute).toHaveBeenCalledOnce();
-      expect(result.text).toBe("verified");
+      expect(result.finalText).toBe("verified");
     },
   );
 
