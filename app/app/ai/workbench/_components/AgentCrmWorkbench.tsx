@@ -14,6 +14,13 @@ import {
 import { RefinementControls } from "./RefinementControls";
 import { JevEvaluationControls } from "./JevEvaluationControls";
 import type { JevChoiceReview } from "@/lib/ai/evals/contracts";
+import { MotionDisclosure } from "@/components/ui/motion-disclosure";
+import {
+  WorkbenchMessage,
+  WorkbenchRunStatus,
+  statusFromWorkbenchEvent,
+  statusFromWorkbenchSnapshot,
+} from "./WorkbenchMotion";
 import {
   Sheet,
   SheetContent,
@@ -234,8 +241,18 @@ const fetchDetail = async (runId: string): Promise<Detail> => {
   ]);
   const detailBody = await detailResponse.json();
   if (!detailResponse.ok) throw new Error(detailBody.error?.message ?? "无法读取运行详情");
+  const loaded = detailBody.data as Detail;
+  const status = statusFromWorkbenchSnapshot(loaded.status, loaded.events ?? []);
+  const failure =
+    status === "failed"
+      ? loaded.events?.findLast((event) => event.event_type === "run_failed")
+      : undefined;
   return {
-    ...detailBody.data,
+    ...loaded,
+    status,
+    error_code:
+      loaded.error_code ??
+      (typeof failure?.payload.code === "string" ? failure.payload.code : null),
     ...evaluation,
   };
 };
@@ -272,6 +289,9 @@ export function AgentCrmWorkbench({
   const detailsButtonRef = useRef<HTMLButtonElement>(null);
   const lastPanel = useRef<"settings" | "details">("settings");
   const messagesRef = useRef<HTMLDivElement>(null);
+  const followMessages = useRef(true);
+  const submissionSequence = useRef(0);
+  const [turnMotion, setTurnMotion] = useState({ key: "initial", live: false });
   const busyRef = useRef(false);
   const cancellingRef = useRef(false);
   const [cancelling, setCancelling] = useState(false);
@@ -404,6 +424,8 @@ export function AgentCrmWorkbench({
     setBusy(true);
     setPanel(null);
     setError("");
+    followMessages.current = true;
+    setTurnMotion({ key: `submitted:${++submissionSequence.current}`, live: true });
     setSubmittedTask(task.trim());
     if (detail) setPreviousTurns((turns) => [...turns, detail]);
     setDetail(null);
@@ -509,23 +531,26 @@ export function AgentCrmWorkbench({
             const event = JSON.parse(dataLine.slice(6)) as EventRow;
             if (!event.sequence || event.sequence <= sequence) continue;
             sequence = event.sequence;
-            setDetail((current) =>
-              current?.id === runId ? { ...current, events: [...current.events, event] } : current,
-            );
-            if (
-              ["run_completed", "run_partial", "run_failed", "run_cancelled"].includes(
-                event.event_type,
-              )
-            ) {
-              status =
-                event.event_type === "run_completed"
-                  ? "completed"
-                  : event.event_type === "run_partial"
-                    ? "partial"
-                    : event.event_type === "run_failed"
-                      ? "failed"
-                      : "cancelled";
-            }
+            const eventStatus = statusFromWorkbenchEvent(event.event_type);
+            if (eventStatus) status = eventStatus;
+            setDetail((current) => {
+              if (current?.id !== runId) return current;
+              // A cancellation/detail read may already have observed a terminal
+              // state while an older stream chunk was in flight. Never revive it.
+              const terminal = ["completed", "partial", "failed", "cancelled"].includes(
+                current.status,
+              );
+              return {
+                ...current,
+                ...(!terminal && eventStatus ? { status: eventStatus } : {}),
+                ...(!terminal &&
+                event.event_type === "run_failed" &&
+                typeof event.payload.code === "string"
+                  ? { error_code: event.payload.code }
+                  : {}),
+                events: [...current.events, event],
+              };
+            });
           } catch {
             /* 忽略心跳与不完整片段，下一块继续解析。 */
           }
@@ -678,7 +703,9 @@ export function AgentCrmWorkbench({
 
   useEffect(() => {
     const messages = messagesRef.current;
-    if (messages) messages.scrollTop = messages.scrollHeight;
+    // Reading earlier messages is intentional. Polls/results must not pull the
+    // operator back down; submitting a new task or opening history opts in.
+    if (messages && followMessages.current) messages.scrollTop = messages.scrollHeight;
   }, [detail?.id, detail?.status, detail?.final_text, submittedTask, previousTurns.length]);
 
   useEffect(() => {
@@ -727,6 +754,8 @@ export function AgentCrmWorkbench({
     readingHistory.current += 1;
     evaluationRequest.current = null;
     setReadingEvaluation(null);
+    followMessages.current = true;
+    setTurnMotion({ key: "initial", live: false });
     setDetail(null);
     setPreviousTurns([]);
     setSubmittedTask("");
@@ -750,6 +779,8 @@ export function AgentCrmWorkbench({
     try {
       const loaded = await fetchDetail(runId);
       if (request !== readingHistory.current) return;
+      followMessages.current = true;
+      setTurnMotion({ key: `history:${runId}`, live: false });
       setDetail(loaded);
       setPreviousTurns([]);
       setSubmittedTask("");
@@ -822,6 +853,11 @@ export function AgentCrmWorkbench({
         ref={messagesRef}
         role="region"
         aria-label="Agent 对话"
+        onScroll={(event) => {
+          const region = event.currentTarget;
+          followMessages.current =
+            region.scrollHeight - region.clientHeight - region.scrollTop <= 48;
+        }}
         tabIndex={0}
         className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 sm:p-6"
       >
@@ -864,21 +900,30 @@ export function AgentCrmWorkbench({
         ))}
         {displayedTask && (
           <section className="mx-auto max-w-3xl space-y-3" aria-label="当前运行">
-            <p className="ml-auto w-fit max-w-[90%] rounded-xl bg-muted px-4 py-3 text-sm break-words whitespace-pre-wrap">
+            <WorkbenchMessage key={`${turnMotion.key}:task`} kind="task" animate={turnMotion.live}>
               {displayedTask}
-            </p>
-            <div role="status" className="text-xs text-muted-foreground">
-              {detail
-                ? `运行状态：${detail.status}`
-                : busy
-                  ? "正在提交任务…"
-                  : "无法确认运行状态，请先查看最近运行"}
-              {latestEvent ? ` · ${eventLabel(latestEvent)}` : ""}
+            </WorkbenchMessage>
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+            >
+              {detail ? (
+                <WorkbenchRunStatus status={detail.status} />
+              ) : busy ? (
+                "正在提交任务…"
+              ) : (
+                "无法确认运行状态，请先查看最近运行"
+              )}
+              {latestEvent ? <span>{eventLabel(latestEvent)}</span> : null}
             </div>
             {detail?.final_text && (
-              <article className="rounded-lg bg-surface p-4 text-sm leading-6 break-words whitespace-pre-wrap">
+              <WorkbenchMessage
+                key={`${turnMotion.key}:result`}
+                kind="result"
+                animate={turnMotion.live && !["failed", "cancelled"].includes(detail.status)}
+              >
                 {detail.final_text}
-              </article>
+              </WorkbenchMessage>
             )}
             {detail?.scope?.contactId &&
               ["completed", "partial", "failed", "cancelled"].includes(detail.status) && (
@@ -996,7 +1041,7 @@ export function AgentCrmWorkbench({
               type="button"
               disabled={cancelling}
               onClick={() => void cancelRun()}
-              className="shrink-0 rounded-md border px-3 py-3 text-sm"
+              className="workbench-composer-action shrink-0 rounded-md border px-3 py-3 text-sm"
             >
               {cancelling ? "取消中…" : "取消运行"}
             </button>
@@ -1004,7 +1049,7 @@ export function AgentCrmWorkbench({
             <button
               type="submit"
               disabled={!modelConfigured || cannotStart || !task.trim() || !selected}
-              className="shrink-0 rounded-md bg-primary px-3 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className="workbench-composer-action shrink-0 rounded-md bg-primary px-3 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
               {busy ? "运行中…" : "运行 Agent"}
             </button>
@@ -1228,6 +1273,8 @@ export function AgentCrmWorkbench({
                             const request = ++readingHistory.current;
                             const loaded = await fetchDetail(runId);
                             if (request !== readingHistory.current) return;
+                            followMessages.current = true;
+                            setTurnMotion({ key: `history:${runId}`, live: false });
                             setDetail(loaded);
                             const url = new URL(window.location.href);
                             url.searchParams.set("run", runId);
@@ -1479,11 +1526,16 @@ export function AgentCrmWorkbench({
                         </div>
                         <div className="mt-2 space-y-1">
                           {detail.evaluation.dimensions.map((dimension) => (
-                            <details key={dimension.key} className="rounded-md border p-2">
-                              <summary className="cursor-pointer text-muted-foreground">
-                                {dimension.label} · {dimension.verdict}
-                                {dimension.score === null ? "" : ` · ${dimension.score}`}
-                              </summary>
+                            <MotionDisclosure
+                              key={dimension.key}
+                              className="rounded-md border p-2"
+                              title={
+                                <>
+                                  {dimension.label} · {dimension.verdict}
+                                  {dimension.score === null ? "" : ` · ${dimension.score}`}
+                                </>
+                              }
+                            >
                               {dimension.findings.length > 0 ? (
                                 <ul className="mt-2 space-y-1">
                                   {dimension.findings.map((finding) => (
@@ -1500,7 +1552,7 @@ export function AgentCrmWorkbench({
                                   此项检查未发现问题；不代表业务结果已验收。
                                 </p>
                               )}
-                            </details>
+                            </MotionDisclosure>
                           ))}
                         </div>
                         <p className="mt-2 text-muted-foreground">
@@ -1614,10 +1666,10 @@ export function AgentCrmWorkbench({
                 </div>
 
                 {detail && (
-                  <details className="rounded-lg border p-3">
-                    <summary className="cursor-pointer text-sm font-medium">
-                      执行时间线 · {detail.events.length} 条事件
-                    </summary>
+                  <MotionDisclosure
+                    className="rounded-lg border p-3"
+                    title={<>执行时间线 · {detail.events.length} 条事件</>}
+                  >
                     <div className="mt-3 space-y-3 break-words">
                       {detail.events.map((event) => {
                         const conflictNote = expertConflictTimelineNote(event);
@@ -1639,7 +1691,7 @@ export function AgentCrmWorkbench({
                         );
                       })}
                     </div>
-                  </details>
+                  </MotionDisclosure>
                 )}
                 {detail && (
                   <OntologyEvidence
@@ -1658,14 +1710,16 @@ export function AgentCrmWorkbench({
                       来自本次运行成功工具观察，已重新核对当前来源权限。索引版本不等于商业政策批准。
                     </p>
                     {detail!.observed_evidence!.map((item) => (
-                      <details
+                      <MotionDisclosure
                         key={`${item.id}:${item.revision}`}
                         className="rounded-md border p-2"
+                        title={
+                          <>
+                            {item.title}
+                            {item.index_status === "superseded" ? " · 索引已有更新，请重查" : ""}
+                          </>
+                        }
                       >
-                        <summary className="cursor-pointer font-medium">
-                          {item.title}
-                          {item.index_status === "superseded" ? " · 索引已有更新，请重查" : ""}
-                        </summary>
                         <p className="mt-2 break-words whitespace-pre-wrap">{item.excerpt}</p>
                         <p className="mt-2 text-xs break-all text-muted-foreground">
                           {item.revision_kind === "index_version" ? "索引版本" : "记忆快照"}：
@@ -1685,7 +1739,7 @@ export function AgentCrmWorkbench({
                             查看来源
                           </a>
                         )}
-                      </details>
+                      </MotionDisclosure>
                     ))}
                   </section>
                 )}

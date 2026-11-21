@@ -34,7 +34,14 @@ function detail(id: string, task: string, state = status) {
       {
         id: `${id}-event`,
         sequence: 1,
-        event_type: "run_completed",
+        event_type:
+          state === "running"
+            ? "context_loaded"
+            : state === "awaiting_confirmation"
+              ? "human_confirmation_requested"
+              : state === "queued"
+                ? "run_started"
+                : `run_${state}`,
         payload: {},
         created_at: "2026-10-01T00:00:00Z",
       },
