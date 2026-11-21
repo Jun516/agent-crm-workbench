@@ -1300,6 +1300,12 @@ jobs:
       # tabela que ainda não existe) — está no CLAUDE.md e foi confirmado neste
       # CI. O que o self-hoster aplica é o `baseline.sql`, então é ele que o
       # e2e aplica: o banco do teste fica igual ao de quem instalou o produto.
+      - name: Habilitar Mailpit para a parte com confirmação por e-mail
+        if: matrix.parte == 1
+        run: |
+          sed -i '/^\[inbucket\]/,/^\[/{s/^enabled = false$/enabled = true/;}' supabase/config.toml
+          sed -n '/^\[inbucket\]/,/^\[/p' supabase/config.toml | grep -qx 'enabled = true'
+
       - name: Subir Supabase local (sem a cadeia de migrations)
         run: |
           mv supabase/migrations /tmp/migrations-off

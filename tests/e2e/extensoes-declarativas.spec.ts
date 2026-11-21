@@ -969,9 +969,9 @@ test("pacote pós-build atravessa catálogo, tenants, guia e Tarefas com recuper
     await trocarOrganizacao(managerPage!, atores!.organizacaoA);
     await managerPage!.goto("/app/crm");
     await expect(
-      managerPage!.getByTestId(
-        `extension-contribution-${installationId}-${catalogo!.pacote.cardId}`,
-      ),
+      managerPage!
+        .getByTestId(`extension-contribution-${installationId}-${catalogo!.pacote.cardId}`)
+        .filter({ visible: true }),
     ).toBeVisible();
     expect(catalogo!.estaLigado()).toBe(false);
     await semOverflowHorizontal(managerPage!);
