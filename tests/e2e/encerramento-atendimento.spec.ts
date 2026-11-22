@@ -167,8 +167,11 @@ test("fechar canal preserva demanda, desfecho explícito e nova entrada volta à
     await page.waitForURL(/\/app(?:\/|$)/);
     await abrirConversa(page, conversation);
     const panel = page.getByTestId("inbox-demandas");
+    // O detalhe da conversa termina de carregar antes do resumo de CRM.
+    await expect(page.getByTestId("inbox-memoria")).toContainText("Preferência de horário", {
+      timeout: 15_000,
+    });
     await expect(panel.getByText("Demanda vigente neste canal")).toBeVisible();
-    await expect(page.getByTestId("inbox-memoria")).toContainText("Preferência de horário");
     // DoD 12 para a issue #908: o rótulo do botão que CRIA o lead provado pela
     // tela, não só em jsdom. O painel é `flex flex-wrap` e o rótulo ficou mais
     // longo — se ele quebrar a fileira ou sumir, é aqui que aparece. Cabe nesta
