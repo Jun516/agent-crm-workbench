@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node tests/smoke.cjs && node tests/full-smoke.cjs && node tests/chat-dom.cjs && node tests/runtime-lab.cjs && node tests/runtime-lab-dom.cjs && node tests/inspection-dom.cjs && node tests/visual-style.cjs && node tests/agent-services-dom.cjs && node tests/real-recordings.cjs",
+    "test": "node tests/smoke.cjs && node tests/full-smoke.cjs && node tests/chat-dom.cjs && node tests/runtime-lab.cjs && node tests/runtime-lab-dom.cjs && node tests/inspection-dom.cjs && node tests/visual-style.cjs && node tests/agent-services-dom.cjs && node tests/real-recordings.cjs && node tests/governance-dom.cjs",
     "test:engine": "node tests/runtime-lab.cjs",
     "test:recordings": "node tests/real-recordings.cjs"
   },

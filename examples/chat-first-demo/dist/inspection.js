@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const ref = '12749abaa8aa98f7bee988f69fb4aa23e9d5ff29';
-  const source = path => 'https://github.com/helsome/AiNativeCrm/blob/' + ref + '/' + path;
+  const source = path => 'https://github.com/Jun516/agent-crm-workbench/blob/4e424c8c447d26d86b010594028d0a032c0fe0ef/' + path;
   const h = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const link = (path, label) => `<a href="${source(path)}" target="_blank" rel="noopener noreferrer">${h(label)}</a>`;
   const tabs = [['evidence','知识证据'],['memory','版本记忆'],['eval','Eval 理由'],['mission','客户发送'],['setup','代码与配置']];

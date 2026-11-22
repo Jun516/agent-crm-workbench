@@ -3,7 +3,7 @@
   'use strict';
   const ref = '12749abaa8aa98f7bee988f69fb4aa23e9d5ff29';
   const h = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const source = (path, label) => `<a href="https://github.com/helsome/AiNativeCrm/blob/${ref}/${path}" target="_blank" rel="noopener noreferrer">${h(label)}</a>`;
+  const source = (path, label) => `<a href="https://github.com/Jun516/agent-crm-workbench/blob/4e424c8c447d26d86b010594028d0a032c0fe0ef/${path}" target="_blank" rel="noopener noreferrer">${h(label)}</a>`;
   const providers = [
     {id:'mem0',name:'Mem0',purpose:'负责人确认的客户偏好、事实与沟通背景',fields:'organization_id · base_url · api_key'},
     {id:'weknora',name:'WeKnora',purpose:'组织授权的公司与产品 Wiki',fields:'organization_id · base_url · api_key · knowledge_base_ids · visibility=organization'},
