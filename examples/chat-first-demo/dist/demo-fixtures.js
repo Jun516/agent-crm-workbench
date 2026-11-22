@@ -3,7 +3,7 @@
   'use strict';
   const ref = '12749abaa8aa98f7bee988f69fb4aa23e9d5ff29';
   const historicalRef = 'fc80b14dc88406ab6f5e6ec3ed9ca61d632c0674';
-  const source = path => 'https://github.com/helsome/AiNativeCrm/blob/' + ref + '/' + path;
+  const source = path => 'https://github.com/Jun516/agent-crm-workbench/blob/4e424c8c447d26d86b010594028d0a032c0fe0ef/' + path;
   const fixtures = {
     schemaVersion: 1, sourceRef: ref, scenarioId: 'starbridge-policy-v1',
     tenantId: 'demo-org-starbridge',
@@ -30,7 +30,7 @@
     historical: {
       kind: 'committed_report_excerpt', capturedDate: '2026-09-28', provider: 'opencode', model: 'space-bunny-free',
       reportTitle: 'DuoAgent Runtime 与 Eval 真实模型验收', sourcePath: 'docs/testing/multi-agent-eval-real-run-2026-09-28.md',
-      sourceUrl: 'https://github.com/helsome/AiNativeCrm/blob/' + historicalRef + '/docs/testing/multi-agent-eval-real-run-2026-09-28.md',
+      sourceUrl: source('docs/testing/multi-agent-eval-real-run-2026-09-28.md'),
       reportRunId: 'b030b8d5-ba15-4168-8407-1ad886ce1743', mode: 'inspect', sourceRef: historicalRef,
       limitations: '仓库已提交验收报告的最小摘录；本次未重新调用模型、查询原数据库或验证报告所述运行。没有完整原始事件 JSON；不补造逐条工具输入/输出，不展示客户正文或内部推理。',
       specialists: [

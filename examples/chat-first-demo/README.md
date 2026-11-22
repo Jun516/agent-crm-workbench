@@ -1,5 +1,17 @@
 # Pi Native CRM: chat-first, no-key demonstration
 
+## Jev 裁决与 RSI 只读自精炼
+
+打开工作台 `/#/app/ai/workbench`，点 **Jev / RSI 演练**。两个演练共用虚构的跨境客户报价案例。
+
+- Jev 可切换四个案例。查看逐项置信度与 80% 采纳门槛，区分低置信转人工、证据受限和独立硬规则拦截，展开当前授权证据。
+- RSI 可逐步核验候选报告。预算充足时观察两轮只读比较及失败经验如何影响下一轮。低预算时查看为何停止及哪个结论仅能作为部分结果交回。
+- 案例中的模型输出和用量为演示预设。页面运行可观察的浏览器逻辑，没有调用模型、写入 CRM 或发送消息。重置与刷新只改变本地演练状态。界面链接到对应的完整 CRM 源码。
+
+Public static hosting publishes the contents of `dist/` directly, including the MIT license. To preview locally, run `node scripts/serve-agent-demo.mjs` from the repository root. Run `npm test` from this example directory to exercise the static pages and both new paths.
+
+The inspection and recording pages retain their historical reference IDs. Source and report links open the corresponding files in the merged workbench snapshot (`4e424c8`).
+
 ## 2026-10-03 真实模型录制
 
 工作台右上角“真实模型录制”新增两次本机真实 Pi / OpenCode `space-bunny-free` 运行，
