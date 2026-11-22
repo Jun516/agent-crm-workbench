@@ -163,6 +163,10 @@ pnpm dev:crons
 
 Mem0、WeKnora 与 Langfuse 的本地服务部署和组织绑定，见 [本地服务指南](infra/local-agent-services/README.md)与[接入契约](docs/integrations/agent-services.md)。
 
+### VPS 自托管
+
+安装和升级步骤见 [VPS 部署工具包](hostgator-setup-kit/README.md)。使用 Codex 时，可调用 `$pi-native-instalar` 获取交互式安装指引。
+
 ### 演示与真实运行回放
 
 ```bash
