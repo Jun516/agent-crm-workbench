@@ -187,7 +187,10 @@ test.describe("com o navegador em outro fuso que a organização", () => {
     // 1) o que o SERVIDOR pinta, com o JavaScript da aplicação bloqueado.
     await page.route("**/_next/static/chunks/**", (rota) => rota.abort());
     await page.goto("/app/agenda");
-    const doServidor = await diasDaAgenda
+    // O streaming pode entregar as colunas antes que o main acessível apareça.
+    const diasNoHtml = page.locator('[data-testid^="coluna-dia-"]');
+    await expect(diasNoHtml).toHaveCount(7);
+    const doServidor = await diasNoHtml
       .evaluateAll((els) =>
         els.map((el) => el.getAttribute("data-testid")!.replace("coluna-dia-", "")).sort(),
       );
