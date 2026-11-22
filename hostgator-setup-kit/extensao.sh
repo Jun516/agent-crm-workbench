@@ -66,8 +66,11 @@ baixar_para() {
 # pelo motivo ERRADO — o `curl` recusava o protocolo do arquivo local antes de a validação
 # rodar, e tirar a validação inteira não deixava o teste vermelho. Medido, não suposto.
 catalogo_tem_forma() {
-  jq -e '.format_version == 1 and (.entries | type == "array") and (.origin | type == "string")' \
-    "$1" >/dev/null 2>&1
+  # O modo slurp produz um array mesmo sem entrada, para o teste de quantidade não ser pulado.
+  jq -es '
+    length == 1 and (.[0] |
+      .format_version == 1 and (.entries | type == "array") and (.origin | type == "string"))
+  ' "$1" >/dev/null 2>&1
 }
 
 comando_listar() {
