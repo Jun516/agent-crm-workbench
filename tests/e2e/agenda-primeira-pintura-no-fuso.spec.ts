@@ -152,11 +152,12 @@ test("fuso inutilizável no banco não derruba a tela — ela abre no padrão do
   await entrar(page, email);
   await page.goto("/app/agenda");
 
+  const agenda = page.getByRole("main").getByTestId("tela-agenda");
   await expect(
-    page.getByTestId("tela-agenda"),
+    agenda,
     `com ${FUSO_QUE_O_INTL_RECUSA} gravado, a Agenda não abriu — a escada de fuso deixou de falhar aberta`,
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('[data-testid^="coluna-dia-"]').first()).toBeAttached();
+  await expect(agenda.locator('[data-testid^="coluna-dia-"]').first()).toBeAttached();
 });
 
 /**
@@ -180,12 +181,16 @@ test.describe("com o navegador em outro fuso que a organização", () => {
   }) => {
     const { email } = await fixture(FUSO_DA_ORG);
     await entrar(page, email);
+    const agenda = page.getByRole("main").getByTestId("tela-agenda");
+    const diasDaAgenda = agenda.locator('[data-testid^="coluna-dia-"]');
 
     // 1) o que o SERVIDOR pinta, com o JavaScript da aplicação bloqueado.
     await page.route("**/_next/static/chunks/**", (rota) => rota.abort());
     await page.goto("/app/agenda");
-    const doServidor = await page
-      .locator('[data-testid^="coluna-dia-"]')
+    // O streaming pode entregar as colunas antes que o main acessível apareça.
+    const diasNoHtml = page.locator('[data-testid^="coluna-dia-"]');
+    await expect(diasNoHtml).toHaveCount(7);
+    const doServidor = await diasNoHtml
       .evaluateAll((els) =>
         els.map((el) => el.getAttribute("data-testid")!.replace("coluna-dia-", "")).sort(),
       );
@@ -197,15 +202,14 @@ test.describe("com o navegador em outro fuso que a organização", () => {
     // 2) o que a GRADE mostra com a página viva.
     await page.unroute("**/_next/static/chunks/**");
     await page.goto("/app/agenda");
-    await expect(page.getByTestId("tela-agenda")).toBeVisible({ timeout: 30_000 });
+    await expect(agenda).toBeVisible({ timeout: 30_000 });
     // A grade repinta na hidratação; espera a semana ESTABILIZAR antes de ler,
     // senão o que se compara é o meio da troca.
     await expect
       .poll(
         async () =>
           (
-            await page
-              .locator('[data-testid^="coluna-dia-"]')
+            await diasDaAgenda
               .evaluateAll((els) =>
                 els.map((el) => el.getAttribute("data-testid")!.replace("coluna-dia-", "")).sort(),
               )
@@ -214,8 +218,7 @@ test.describe("com o navegador em outro fuso que a organização", () => {
       )
       .toMatch(/^(\d{4}-\d{2}-\d{2},){6}\d{4}-\d{2}-\d{2}$/);
 
-    const doNavegador = await page
-      .locator('[data-testid^="coluna-dia-"]')
+    const doNavegador = await diasDaAgenda
       .evaluateAll((els) =>
         els.map((el) => el.getAttribute("data-testid")!.replace("coluna-dia-", "")).sort(),
       );

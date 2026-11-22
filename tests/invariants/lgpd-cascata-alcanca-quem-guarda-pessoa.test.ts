@@ -117,12 +117,12 @@ function tabelasNaCascata(): string[] {
      where p.proname = 'fn_lgpd_cascade_redact_contact'
         or (
           p.pronamespace = 'public'::regnamespace
-          and p.proname = 'fn_ai_customer_memory_privacy'
+          and p.proname in ('fn_ai_customer_memory_privacy','fn_ai_memory_candidate_privacy')
           and exists (
             select 1 from pg_trigger t
              where t.tgfoid = p.oid
                and t.tgrelid = 'public.contacts'::regclass
-               and t.tgname = 'trg_ai_customer_memory_privacy'
+               and t.tgname = case p.proname when 'fn_ai_customer_memory_privacy' then 'trg_ai_customer_memory_privacy' else 'trg_ai_memory_candidate_privacy' end
                and not t.tgisinternal
                and t.tgenabled in ('O', 'A')
                and t.tgtype = 27 -- BEFORE UPDATE OR DELETE FOR EACH ROW

@@ -1,5 +1,7 @@
 # HANDOFF — IA 360
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Documento **vivo**. Alimentado a cada progresso, cada bug encontrado e cada bug corrigido.
 > Toda afirmação declara o **SHA curto** de onde foi medida. Número sem SHA não compara.
 >
@@ -162,10 +164,10 @@ as rodadas. **Não afirmo suíte 100% verde nesta máquina**; afirmo que o verme
 é de carga e não desta wave, e que o CI (máquina dedicada) é quem dá a palavra.
 
 Evidência visual versionada em `evidence/ia-360-w1/`:
-![capacidades por jornada](../../evidence/ia-360-w1/w1-capacidades-por-jornada.png)
-![pacote ligado sem o envio](../../evidence/ia-360-w1/w1-pacote-ligado-sem-envio.png)
-![modo avançado](../../evidence/ia-360-w1/w1-modo-avancado.png)
-![uso das capacidades](../../evidence/ia-360-w1/w1-uso-das-capacidades.png)
+capacidades por jornada (captura histórica ../../evidence/ia-360-w1/w1-capacidades-por-jornada.png)
+pacote ligado sem o envio (captura histórica ../../evidence/ia-360-w1/w1-pacote-ligado-sem-envio.png)
+modo avançado (captura histórica ../../evidence/ia-360-w1/w1-modo-avancado.png)
+uso das capacidades (captura histórica ../../evidence/ia-360-w1/w1-uso-das-capacidades.png)
 
 #### Sabotagem (verde de primeira não prova nada)
 
@@ -232,7 +234,7 @@ O conserto foi no `components/ui/tabs.tsx` e no `AppShell`, não na minha tela, 
 propósito: **toda** `TabsList` do app tinha a mesma fragilidade, e consertar só onde
 eu esbarrei deixaria as irmãs quebradas com um álibi de "já foi tratado".
 
-**Achado que NÃO é meu e eu não consertei** (`evidence/ia-360-w1/w1-achado-390px-sidebar-fixo.png`):
+**Achado que NÃO é meu e eu não consertei** (evidence/ia-360-w1/w1-achado-390px-sidebar-fixo.png):
 em 390px o app é inutilizável — o sidebar é fixo em **240px** e não colapsa, sobrando
 ~150px de conteúdo, com campos de formulário de uma letra por linha. Vale para toda
 tela do produto, não só esta. Ponto de quebra medido: **768px é o menor tamanho usável**
@@ -260,7 +262,7 @@ o painel da W1 mostrou as duas, marcadas "só em teste" (o run era dry-run)
 ```
 
 Isto é o fecho da alça que a wave existe para fazer: **configurei pela tela → a IA
-real decidiu usar → eu vejo o que ela usou**. Evidência: `evidence/ia-360-w1/w1-ia-real-uso-no-painel.png`.
+real decidiu usar → eu vejo o que ela usou**. Evidência: evidence/ia-360-w1/w1-ia-real-uso-no-painel.png.
 
 **Um defeito MEU que só a IA real revelou.** Dois minutos depois de criar o agente, o
 painel dizia *"7 capacidades pedem uma decisão sua"* e recomendava **desligar** o que o
@@ -283,7 +285,7 @@ fala com engenheiro — *"Max steps"*, *"Token budget"*, *"Custo máx (cents)"*,
 regex"* com exemplo `(?i)\b(pedido|status)\b`, *"Maior prioridade = avaliado primeiro
 pelo dispatcher"*, *"Permitir handoff via tool"*, e o título *"Novo agent"*. O pilar 3
 foi aplicado num bloco e não na tela. Não corrigi: é escopo de produto e toca campos de
-outras waves — **item para o Maestro**, com a captura `evidence/ia-360-w1/w1-nova-01-tela-de-criar.png`.
+outras waves — **item para o Maestro**, com a captura evidence/ia-360-w1/w1-nova-01-tela-de-criar.png.
 
 **O que este spec NÃO alcança, declarado:** o estado "instalei agora e não tenho
 credencial nem número". A primeira versão tentou montá-lo interceptando as listagens no
@@ -337,7 +339,7 @@ Varredura final de jargão no texto visível (`TreeWalker` sobre nós de texto, 
 `ai/credentials`: **limpo** nas três. O único casamento restante é o nome de uma
 credencial criada pelo seed de teste — dado, não interface.
 
-Prova: `evidence/ia-360-w1/w1-pt-01-criar-agente.png`, `evidence/ia-360-w1/w1-pt-02-uso-de-ia.png`, `evidence/ia-360-w1/w1-pt-03-chaves.png`.
+Prova: evidence/ia-360-w1/w1-pt-01-criar-agente.png, evidence/ia-360-w1/w1-pt-02-uso-de-ia.png, evidence/ia-360-w1/w1-pt-03-chaves.png.
 `pnpm typecheck` limpo · `pnpm lint` 0 erros · E2E das duas telas **10 passed**.
 
 **E o login de E2E agora se recupera sozinho** (`tests/e2e/helpers/login-admin.ts`):
@@ -1198,16 +1200,16 @@ O que ficou provado, em ordem:
 1. **O agente cria uma etapa** → ela aparece em `/app/settings/tenant/pipelines` na posição 9 do
    funil, e o campo `data-autoria="ai"` mostra **"alterado pelo assistente há 2 segundos"**. As
    oito etapas de fábrica aparecem **sem selo** — silêncio honesto para o que ninguém mediu.
-   Evidência: `evidence/ia-360-w4/w4-etapa-criada-pelo-agente.png`.
+   Evidência: evidence/ia-360-w4/w4-etapa-criada-pelo-agente.png.
 2. **O agente liga uma regra escrita por um humano** → `/app/webhooks` mostra o cartão com o
    badge **"Ativa"** e, abaixo, **"alterado pelo assistente há 3 segundos"**. Evidência:
-   `evidence/ia-360-w4/w4-regra-ligada-pelo-agente.png`.
+   evidence/ia-360-w4/w4-regra-ligada-pelo-agente.png.
 3. **A regra ligada pelo agente dispara e o egress continua barrado.** Um receiver HTTP de
    verdade sobe em `127.0.0.1:<porta efêmera>`; a regra aponta para ele; um lead entra pela URL
    de captação; o `event_log` é drenado. O receiver registrou **zero** requisições
    (`assertSafeOutboundUrl` recusa host privado antes do `fetch`) **e** a aba Atividade mostra a
    execução com falha — barrar em silêncio faria o dono achar que o outro sistema recebeu.
-   Evidência: `evidence/ia-360-w4/w4-egress-barrado-com-registro.png`.
+   Evidência: evidence/ia-360-w4/w4-egress-barrado-com-registro.png.
 
 **Sabotagem do E2E** (a única propriedade que o despacho cobra nominalmente):
 
@@ -1634,8 +1636,8 @@ que importa é a mesma.
 Segundo defeito no mesmo lugar: o selo respondia *"por que vejo isto"* e não
 *"o que faço a seguir"* — metade do invariante 5.
 
-Evidência: `evidence/ia-360-w4/qa-selo-no-funil-usado.png` e
-`evidence/ia-360-w4/qa-tela-de-escolha-de-capacidades.png`.
+Evidência: evidence/ia-360-w4/qa-selo-no-funil-usado.png e
+evidence/ia-360-w4/qa-tela-de-escolha-de-capacidades.png.
 
 ### A fila de abas empurrava a página inteira (W1)
 
@@ -1650,8 +1652,8 @@ app tinha a mesma fragilidade. Estouro em 390px caiu de 476px para 212, e os 212
 restantes foram medidos como **não sendo dessa tela** (a lista de agentes estoura
 os mesmos).
 
-Evidência: `evidence/ia-360-w1/w1-tablet-768px.png` (largura usável) e
-`evidence/ia-360-w1/w1-tema-escuro.png`.
+Evidência: evidence/ia-360-w1/w1-tablet-768px.png (largura usável) e
+evidence/ia-360-w1/w1-tema-escuro.png.
 
 ### Achado de produto NÃO consertado, com o número junto
 
@@ -1687,32 +1689,32 @@ mesma família dos defeitos do épico, na camada da ferramenta de medir.
 criado PELO FORMULÁRIO, turno completo em 6,7s — e a IA escolheu sozinha
 `crm_list_pipelines` e `crm_list_leads`. Passo a passo:
 
-- `evidence/ia-360-w1/w1-ia-01-credencial.png`
-- `evidence/ia-360-w1/w1-ia-02-credencial-validada.png`
-- `evidence/ia-360-w1/w1-ia-03-agente-preenchido.png`
-- `evidence/ia-360-w1/w1-ia-04-teste-antes.png`
-- `evidence/ia-360-w1/w1-ia-05-teste-resultado.png`
-- `evidence/ia-360-w1/w1-ia-06-uso-real.png`
-- `evidence/ia-360-w1/w1-ia-real-uso-no-painel.png`
-- `evidence/ia-360-w1/w1-nova-01-tela-de-criar.png`
-- `evidence/ia-360-w1/w1-nova-02-preenchido.png`
-- `evidence/ia-360-w1/w1-nova-03-agente-criado.png`
-- `evidence/ia-360-w1/w1-nova-03-preenchido.png`
-- `evidence/ia-360-w1/w1-nova-04-sem-recursos.png`
-- `evidence/ia-360-w1/w1-uso-01-tela.png`
-- `evidence/ia-360-w1/w1-uso-02-periodo-vazio.png`
+- evidence/ia-360-w1/w1-ia-01-credencial.png
+- evidence/ia-360-w1/w1-ia-02-credencial-validada.png
+- evidence/ia-360-w1/w1-ia-03-agente-preenchido.png
+- evidence/ia-360-w1/w1-ia-04-teste-antes.png
+- evidence/ia-360-w1/w1-ia-05-teste-resultado.png
+- evidence/ia-360-w1/w1-ia-06-uso-real.png
+- evidence/ia-360-w1/w1-ia-real-uso-no-painel.png
+- evidence/ia-360-w1/w1-nova-01-tela-de-criar.png
+- evidence/ia-360-w1/w1-nova-02-preenchido.png
+- evidence/ia-360-w1/w1-nova-03-agente-criado.png
+- evidence/ia-360-w1/w1-nova-03-preenchido.png
+- evidence/ia-360-w1/w1-nova-04-sem-recursos.png
+- evidence/ia-360-w1/w1-uso-01-tela.png
+- evidence/ia-360-w1/w1-uso-02-periodo-vazio.png
 
 **As sete telas do épico que não tinham cobertura nenhuma**, abertas com login real e
 MFA: todas com conteúdo, nenhuma com erro de console. Tela sadia provada também é
 resultado — e até então ninguém as tinha aberto.
 
-- `evidence/ia-360-w5/tela-acervo-de-conhecimento.png`
-- `evidence/ia-360-w5/tela-caixa-do-humano.png`
-- `evidence/ia-360-w5/tela-consumo.png`
-- `evidence/ia-360-w5/tela-criar-agente.png`
-- `evidence/ia-360-w5/tela-habilidades.png`
-- `evidence/ia-360-w5/tela-memoria-da-organizacao.png`
-- `evidence/ia-360-w5/tela-roteadores.png`
+- evidence/ia-360-w5/tela-acervo-de-conhecimento.png
+- evidence/ia-360-w5/tela-caixa-do-humano.png
+- evidence/ia-360-w5/tela-consumo.png
+- evidence/ia-360-w5/tela-criar-agente.png
+- evidence/ia-360-w5/tela-habilidades.png
+- evidence/ia-360-w5/tela-memoria-da-organizacao.png
+- evidence/ia-360-w5/tela-roteadores.png
 
 **Outras provas desta rodada:**
 
@@ -1746,79 +1748,79 @@ resultado — e até então ninguém as tinha aberto.
 - `evidence/canais/task5/gates.csv`
 - `evidence/canais/task6/gates.csv`
 - `evidence/cenario-23-ciclo.md`
-- `evidence/f4-painel-com-dado.png`
-- `evidence/f4-painel-sem-dado.png`
-- `evidence/f4-prova-real-whatsapp.png`
+- evidence/f4-painel-com-dado.png
+- evidence/f4-painel-sem-dado.png
+- evidence/f4-prova-real-whatsapp.png
 - `evidence/ia-360-w4/qa-turnos-do-agente.md`
 - `evidence/lgpd.md`
-- `evidence/raio-board-MORTO.png`
-- `evidence/raio-board-controle.png`
-- `evidence/raio-dossie-MORTO.png`
-- `evidence/raio-dossie-controle.png`
-- `evidence/raio-inbox-MORTO.png`
-- `evidence/raio-inbox-controle.png`
+- evidence/raio-board-MORTO.png
+- evidence/raio-board-controle.png
+- evidence/raio-dossie-MORTO.png
+- evidence/raio-dossie-controle.png
+- evidence/raio-inbox-MORTO.png
+- evidence/raio-inbox-controle.png
 - `evidence/raio-x-realtime.md`
-- `evidence/video-c23/cenario-23-ciclo-5ecb8f.webm`
-- `evidence/wave-0-board-antes-full.png`
+- evidence/video-c23/cenario-23-ciclo-5ecb8f.webm
+- evidence/wave-0-board-antes-full.png
 - `evidence/wave-0.md`
-- `evidence/wave-1-board-com-agente.png`
-- `evidence/wave-1-cenario-1-agente-com-versao.png`
-- `evidence/wave-1-cenario-1-agente-sem-versao.png`
-- `evidence/wave-1-cenario-1-card-agente.png`
-- `evidence/wave-1-cenario-2-filtrado-por-agente.png`
-- `evidence/wave-1-cenario-2-filtro-aberto.png`
-- `evidence/wave-1-cenario-3-dono-agente.png`
-- `evidence/wave-1-cenario-3-dono-humano.png`
-- `evidence/wave-1-cenario-4-viewer.png`
-- `evidence/wave-1-devvivo-card-agente.png`
-- `evidence/wave-1-devvivo-dono-agente.png`
-- `evidence/wave-1-devvivo-revertido.png`
+- evidence/wave-1-board-com-agente.png
+- evidence/wave-1-cenario-1-agente-com-versao.png
+- evidence/wave-1-cenario-1-agente-sem-versao.png
+- evidence/wave-1-cenario-1-card-agente.png
+- evidence/wave-1-cenario-2-filtrado-por-agente.png
+- evidence/wave-1-cenario-2-filtro-aberto.png
+- evidence/wave-1-cenario-3-dono-agente.png
+- evidence/wave-1-cenario-3-dono-humano.png
+- evidence/wave-1-cenario-4-viewer.png
+- evidence/wave-1-devvivo-card-agente.png
+- evidence/wave-1-devvivo-dono-agente.png
+- evidence/wave-1-devvivo-revertido.png
 - `evidence/wave-1.md`
-- `evidence/wave-2-board-depois.png`
+- evidence/wave-2-board-depois.png
 - `evidence/wave-2.md`
-- `evidence/wave-3-aba-b-antes.png`
-- `evidence/wave-3-aba-b-depois.png`
-- `evidence/wave-3-aba-c-outro-tenant.png`
-- `evidence/wave-3-c10-painel-falha-de-leitura.png`
-- `evidence/wave-3-c10-painel-inbox.png`
-- `evidence/wave-3-c10-timeline-contato.png`
-- `evidence/wave-3-c11-timeline-veto.png`
-- `evidence/wave-3-c12-apos-pulso.png`
-- `evidence/wave-3-c12-outro-tenant.png`
-- `evidence/wave-3-c12d-duas-chegadas.png`
-- `evidence/wave-3-c12rm-movimento-reduzido.png`
+- evidence/wave-3-aba-b-antes.png
+- evidence/wave-3-aba-b-depois.png
+- evidence/wave-3-aba-c-outro-tenant.png
+- evidence/wave-3-c10-painel-falha-de-leitura.png
+- evidence/wave-3-c10-painel-inbox.png
+- evidence/wave-3-c10-timeline-contato.png
+- evidence/wave-3-c11-timeline-veto.png
+- evidence/wave-3-c12-apos-pulso.png
+- evidence/wave-3-c12-outro-tenant.png
+- evidence/wave-3-c12d-duas-chegadas.png
+- evidence/wave-3-c12rm-movimento-reduzido.png
 - `evidence/wave-3.md`
-- `evidence/wave-4-13a-card-com-proposta.png`
-- `evidence/wave-4-13b-timeline-aprovacao.png`
-- `evidence/wave-4-13c-timeline-recusa.png`
-- `evidence/wave-4-13d-um-contato-dois-negocios.png`
-- `evidence/wave-4-13e-autorizacao-vencida.png`
-- `evidence/wave-4-14-card-sem-proposta.png`
+- evidence/wave-4-13a-card-com-proposta.png
+- evidence/wave-4-13b-timeline-aprovacao.png
+- evidence/wave-4-13c-timeline-recusa.png
+- evidence/wave-4-13d-um-contato-dois-negocios.png
+- evidence/wave-4-13e-autorizacao-vencida.png
+- evidence/wave-4-14-card-sem-proposta.png
 - `evidence/wave-4.md`
-- `evidence/wave-5-tela-com-score-CASO-CONSTRUIDO.png`
-- `evidence/wave-5-tela-par-com-e-sem-score-CASO-CONSTRUIDO.png`
+- evidence/wave-5-tela-com-score-CASO-CONSTRUIDO.png
+- evidence/wave-5-tela-par-com-e-sem-score-CASO-CONSTRUIDO.png
 - `evidence/wave-5.md`
 - `evidence/wave-6.md`
 - `evidence/wave-7.md`
 - `evidence/wave-8.md`
-- `evidence/wave3-pulso/pulso-claro-1-antes.png`
-- `evidence/wave3-pulso/pulso-claro-2-durante.png`
-- `evidence/wave3-pulso/pulso-claro-3-cessou.png`
-- `evidence/wave3-pulso/pulso-escuro-1-antes.png`
-- `evidence/wave3-pulso/pulso-escuro-2-durante.png`
-- `evidence/wave3-pulso/pulso-reduce-1-antes.png`
-- `evidence/wave3-pulso/pulso-reduce-2-durante.png`
-- `evidence/wave6-d20-editar-sem-fechar.png`
-- `evidence/wave6-d21-outra-aba-ao-vivo.png`
-- `evidence/wave6-d24-lead-sem-contato.png`
-- `evidence/wave7-agrupamento-por-dia.png`
-- `evidence/wave7-card-reativacao-decidido.png`
-- `evidence/wave7-card-reativacao.png`
-- `evidence/wave7-janela-do-worker.png`
-- `evidence/wave7-rede-de-seguranca.png`
-- `evidence/wave7-rede-dossie.png`
-- `evidence/wave8-agente-move-antes.png`
-- `evidence/wave8-agente-move-depois.png`
+- evidence/wave3-pulso/pulso-claro-1-antes.png
+- evidence/wave3-pulso/pulso-claro-2-durante.png
+- evidence/wave3-pulso/pulso-claro-3-cessou.png
+- evidence/wave3-pulso/pulso-escuro-1-antes.png
+- evidence/wave3-pulso/pulso-escuro-2-durante.png
+- evidence/wave3-pulso/pulso-reduce-1-antes.png
+- evidence/wave3-pulso/pulso-reduce-2-durante.png
+- evidence/wave6-d20-editar-sem-fechar.png
+- evidence/wave6-d21-outra-aba-ao-vivo.png
+- evidence/wave6-d24-lead-sem-contato.png
+- evidence/wave7-agrupamento-por-dia.png
+- evidence/wave7-card-reativacao-decidido.png
+- evidence/wave7-card-reativacao.png
+- evidence/wave7-janela-do-worker.png
+- evidence/wave7-rede-de-seguranca.png
+- evidence/wave7-rede-dossie.png
+- evidence/wave8-agente-move-antes.png
+- evidence/wave8-agente-move-depois.png
 
 ---
 
@@ -1864,7 +1866,7 @@ antes de a pessoa digitar.
 - `evidence/ia-360-w4/qa-turnos-do-agente.md`
 - `evidence/lgpd.md`
 - `evidence/raio-x-realtime.md`
-- `evidence/video-c23/cenario-23-ciclo-5ecb8f.webm`
+- evidence/video-c23/cenario-23-ciclo-5ecb8f.webm
 - `evidence/wave-0.md`
 - `evidence/wave-1.md`
 - `evidence/wave-2.md`
@@ -2349,7 +2351,7 @@ O dono lê `crm_list_stages` e a descrição escrita **para o modelo**. Pior: as
 nunca dispara**, que é literalmente o defeito que o campo foi criado para impedir. O campo existe
 no dado e não chega à tela. **É a W1, mas o buraco é de agora** — enquanto ela não sai, ligar uma
 capacidade de configuração é uma promessa que o produto não cumpre e não avisa. A tela como o dono
-a vê está em `evidence/ia-360-w4/qa-tela-de-escolha-de-capacidades.png`.
+a vê está em evidence/ia-360-w4/qa-tela-de-escolha-de-capacidades.png.
 
 ### A2 · Dois pacotes ocupam o teto inteiro do agente · CONFIRMADO
 
@@ -2383,7 +2385,7 @@ Sete linhas dizendo ao dono que foi ele quem mexeu, afogando a única que ele pr
 resultante é inócua — sem selo passa a significar "foi uma pessoa" **ou** "é anterior à 0101", e
 nos dois casos a resposta à pergunta que importa é a mesma. Guardado em
 `tests/e2e/qa-selo-no-funil-usado.spec.ts`, que reprova se o ruído voltar. O estado final está em
-`evidence/ia-360-w4/qa-selo-no-funil-usado.png` — sete etapas mexidas por pessoa, silenciosas, e só
+evidence/ia-360-w4/qa-selo-no-funil-usado.png — sete etapas mexidas por pessoa, silenciosas, e só
 a do assistente falando.
 
 ### A4 · O selo era um susto sem saída · CORRIGIDO
@@ -2431,9 +2433,9 @@ Spec: `tests/e2e/qa-telas-descobertas-w4.spec.ts`.
 O caminho do leigo funciona inteiro: a tela tem "Novo template", os campos são achados pelo
 rótulo que o usuário lê (não por `data-testid`), e depois de salvar **a resposta aparece na
 lista** — a prova é a lista, não o toast sumir. Evidência: a tela vazia
-(`evidence/ia-360-w4/qa-tela-templates.png`), o formulário preenchido
-(`evidence/ia-360-w4/qa-tela-templates-criando.png`) e a resposta já na lista
-(`evidence/ia-360-w4/qa-tela-templates-criada.png`).
+(evidence/ia-360-w4/qa-tela-templates.png), o formulário preenchido
+(evidence/ia-360-w4/qa-tela-templates-criando.png) e a resposta já na lista
+(evidence/ia-360-w4/qa-tela-templates-criada.png).
 
 Tela sadia provada também é resultado.
 
@@ -2445,7 +2447,7 @@ manager cai num **403 honesto**. O arquivo existe de propósito, para link salvo
 **Reparo possível, registrado sem inflar:** o 403 diz "Você não tem acesso a essa área" sem dizer
 QUAL área nem por quê. Quem clicou num favorito de "templates" fica sem entender por que a tela de
 respostas prontas (que ele acessa) virou proibida. É UX, não bug.
-Evidência: `evidence/ia-360-w4/qa-tela-settings-templates.png`.
+Evidência: evidence/ia-360-w4/qa-tela-settings-templates.png.
 
 ### T3 · A rota de funis misturava organizações · CORRIGIDO
 
@@ -2482,7 +2484,7 @@ HTTP 200 não é sucesso.
 
 O `SeloDeAutoria` passou a dizer "ver o que mudou" apontando para esta tela, e eu nunca a tinha
 aberto. A tela **existe e carrega** (`h1 = "Audit Log"`, botão "Exportar CSV" —
-`evidence/ia-360-w4/qa-tela-audit.png`).
+evidence/ia-360-w4/qa-tela-audit.png).
 
 **Medição limpa, depois do T3 corrigido:** a etapa FOI criada (`last_change_actor_kind = ai`) e o
 registro FOI gravado (`pipeline.stage_created`, ator `ai_agent`, nome correto, 16:17:56). E a tela

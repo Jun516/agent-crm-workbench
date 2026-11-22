@@ -47,7 +47,7 @@ function parseScopes(raw: unknown): string[] {
   return raw.filter((s): s is string => typeof s === "string");
 }
 
-function scopesRole(scopes: string[]): Role {
+export function scopesRole(scopes: string[]): Role {
   for (const s of scopes) {
     if (s.startsWith("role:")) {
       const r = s.slice("role:".length) as Role;

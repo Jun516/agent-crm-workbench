@@ -891,6 +891,11 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     motivo:
       "endpoint da OpenCode Zen: recebe a validação da credencial e as chamadas OpenAI-compatíveis de `space-bunny-free`; o usuário também obtém a chave de API no painel Zen.",
   },
+  "api.typesafe.ai": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint fixo do avaliador Jev: recebe somente a projeção preparada após confirmação explícita de compartilhamento e quando a integração está configurada.",
+  },
   "api.deepseek.com": {
     categoria: "FORNECEDOR",
     motivo:

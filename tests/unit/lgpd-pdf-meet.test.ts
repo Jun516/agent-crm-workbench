@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { expect, it } from "vitest";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { renderLgpdPdf } from "@/lib/lgpd/pdf-renderer";
@@ -80,11 +80,8 @@ function payload(): ExportPayload {
 
 async function rendered(data: ExportPayload) {
   const bytes = await renderLgpdPdf(data);
-  const fonts =
-    join(
-      dirname(createRequire(import.meta.url).resolve("pdfjs-dist/package.json")),
-      "standard_fonts",
-    ) + sep;
+  const pastaPdfjs = dirname(createRequire(import.meta.url).resolve("pdfjs-dist/package.json"));
+  const fonts = `${join(pastaPdfjs, "standard_fonts")}/`;
   const task = getDocument({ data: new Uint8Array(bytes), standardFontDataUrl: fonts });
   const document = await task.promise;
   try {

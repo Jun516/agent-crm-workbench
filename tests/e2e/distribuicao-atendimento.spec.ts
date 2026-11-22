@@ -21,6 +21,8 @@ import * as path from "node:path";
 
 import { test, expect, type Page } from "@playwright/test";
 
+import { isAppUrl } from "./utils/app-url";
+
 const CREDS_PATH = path.join(process.cwd(), ".e2e-creds.json");
 
 interface Creds {
@@ -45,7 +47,7 @@ async function login(page: Page, email: string): Promise<void> {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill(creds.password);
   await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL(/\/app\//);
+  await page.waitForURL(isAppUrl);
 }
 
 /** O estado marcado vem do atributo que o próprio componente escreve. */
@@ -92,9 +94,10 @@ test.describe("distribuição de atendimento — a tela que liga o rodízio e a 
 
     // 3. Liga o rodízio — e só então os knobs aparecem (config de retentativa
     //    não faz sentido no modo manual, em que ninguém retenta).
-    await expect(page.locator("#max_retries")).toHaveCount(0);
+    const maxRetries = page.getByRole("spinbutton", { name: "Tentativas antes de desistir", exact: true });
+    await expect(maxRetries).toHaveCount(0);
     await page.getByTestId("opcao-modo-round_robin").click();
-    await expect(page.locator("#max_retries")).toBeVisible();
+    await expect(maxRetries).toBeVisible();
 
     // 4. Restringe a visibilidade ao próprio atendente.
     await page.getByTestId("opcao-visibilidade-own").click();
@@ -108,7 +111,7 @@ test.describe("distribuição de atendimento — a tela que liga o rodízio e a 
     await page.reload();
     expect(await marcada(page, "modo", "round_robin")).toBe(true);
     expect(await marcada(page, "visibilidade", "own")).toBe(true);
-    await expect(page.locator("#max_retries")).toBeVisible();
+    await expect(maxRetries).toBeVisible();
 
     // 6. E a API concorda com a tela — se divergissem, uma das duas estaria
     //    mentindo e o operador não teria como saber qual.

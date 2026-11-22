@@ -1,3 +1,4 @@
+import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
 import { beginServiceAtOrigin, assertServiceBoundarySupabase } from "@/lib/atendimento/origem";
 /**
  * MCP special tool — crm_request_human_handoff v2 (Spec 11 §3.3 + G6-01).
@@ -87,22 +88,44 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
       throw new Error("conversation_not_found");
     }
 
-    const boundary = conv.contact_id ? await beginServiceAtOrigin(ctx.supabase, ctx.organizationId, conv.contact_id, conv.channel_session_id) : undefined;
-    if (boundary && boundary.conversation_id !== input.conversation_id) throw new Error("service_scope_mismatch");
-
     // Try to find a lead linked to this contact (best effort for activity insert).
     let leadId: string | null = null;
-    if (conv.contact_id) {
-      const { data: leadRow } = await ctx.supabase
-        .from("crm_leads")
-        .select("id")
-        .eq("organization_id", ctx.organizationId)
-        .eq("contact_id", conv.contact_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      leadId = leadRow?.id ?? null;
+    const workbenchRunId = ctx.ontologyRuntime?.workbenchRunId;
+    let missionLeadId: string | null = null;
+    let leadAmbiguous = false;
+    if (workbenchRunId) {
+      const run = await ctx.supabase.from("ai_workbench_runs").select("mission_id")
+        .eq("organization_id", ctx.organizationId).eq("id", workbenchRunId).maybeSingle();
+      if (run.error || !run.data) throw new Error("handoff_workbench_run_unavailable");
+      if (run.data.mission_id) {
+        const mission = await ctx.supabase.from("ai_missions").select("lead_id")
+          .eq("organization_id", ctx.organizationId).eq("id", run.data.mission_id).maybeSingle();
+        if (mission.error || !mission.data?.lead_id || !conv.contact_id)
+          throw new Error("handoff_mission_scope_unavailable");
+        const lead = await ctx.supabase.from("crm_leads").select("id, contact_id")
+          .eq("organization_id", ctx.organizationId).eq("id", mission.data.lead_id).maybeSingle();
+        if (lead.error || !lead.data || lead.data.contact_id !== conv.contact_id)
+          throw new Error("handoff_mission_scope_mismatch");
+        missionLeadId = lead.data.id;
+      }
     }
+    if (missionLeadId) leadId = missionLeadId;
+    else if (conv.contact_id) {
+      const { data: candidates, error } = await ctx.supabase.from("crm_leads")
+        .select("id, organization_id, pipeline_id, status, last_activity_at, created_at")
+        .eq("organization_id", ctx.organizationId).eq("contact_id", conv.contact_id)
+        .eq("status", "open").limit(2);
+      if (error) throw new Error("handoff_lead_resolution_unavailable");
+      // More than one open business is ambiguous even when activity timestamps differ.
+      leadAmbiguous = (candidates ?? []).length > 1;
+      if ((candidates ?? []).length === 1) {
+        const resolved = resolveActiveLeadForContact(candidates as LeadCandidate[]);
+        if (resolved.routed) leadId = resolved.leadId;
+      }
+    }
+
+    const boundary = conv.contact_id ? await beginServiceAtOrigin(ctx.supabase, ctx.organizationId, conv.contact_id, conv.channel_session_id) : undefined;
+    if (boundary && boundary.conversation_id !== input.conversation_id) throw new Error("service_scope_mismatch");
 
     // O `reason` que o agente externo mandou é TEXTO LIVRE de fora. Ele passa a
     // virar código quando corresponde a um do nosso vocabulário, e o texto vai
@@ -201,6 +224,7 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
 
     return {
       handoff_recorded: result.triggered,
+      lead_resolution: leadAmbiguous ? "ambiguous" : leadId ? "resolved" : "no_open_lead",
       conversation_id: input.conversation_id,
       // Retorno estruturado v2: um destes dois lados é populado.
       assigned_to: assignedUserId,

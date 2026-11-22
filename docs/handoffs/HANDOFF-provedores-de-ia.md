@@ -1,5 +1,7 @@
 # HANDOFF — Provedores de IA: painel, logs e OpenRouter
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Documento **vivo**. Atualizado a cada avanço, cada bug encontrado e cada
 > atividade deixada para trás. Quem assumir esta frente lê daqui.
 
@@ -419,14 +421,14 @@ Cada linha da tabela acima tem a imagem correspondente:
 
 | Tela | Imagem |
 |---|---|
-| Painel aberto, agrupado por papel | `evidence/provedores/01-painel-agrupado.png` |
-| Configuração avançada, ponto a ponto | `evidence/provedores/02-configuracao-avancada.png` |
-| Ponto fixo com a razão escrita | `evidence/provedores/03-ponto-fixo-com-razao.png` |
-| Modelos da OpenRouter no seletor | `evidence/provedores/04-modelos-openrouter.png` |
-| A troca de modelo valeu | `evidence/provedores/05-troca-valeu.png` |
-| Ponto que exige ferramentas | `evidence/provedores/06-exige-ferramentas.png` |
-| Tela de execuções | `evidence/provedores/07-execucoes.png` |
-| Instalação sem agente publicado, com os dois pontos principais destravados | `evidence/provedores/08-sem-agente-publicado-destravado.png` |
+| Painel aberto, agrupado por papel | evidence/provedores/01-painel-agrupado.png |
+| Configuração avançada, ponto a ponto | evidence/provedores/02-configuracao-avancada.png |
+| Ponto fixo com a razão escrita | evidence/provedores/03-ponto-fixo-com-razao.png |
+| Modelos da OpenRouter no seletor | evidence/provedores/04-modelos-openrouter.png |
+| A troca de modelo valeu | evidence/provedores/05-troca-valeu.png |
+| Ponto que exige ferramentas | evidence/provedores/06-exige-ferramentas.png |
+| Tela de execuções | evidence/provedores/07-execucoes.png |
+| Instalação sem agente publicado, com os dois pontos principais destravados | evidence/provedores/08-sem-agente-publicado-destravado.png |
 
 A oitava é de 2026-08-08 e registra um conserto, não a feature: `mandadoPeloAgente`
 era incondicional, e numa instalação recém-feita — nenhuma versão de agente

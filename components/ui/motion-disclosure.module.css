@@ -1,0 +1,41 @@
+.panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 190ms ease-out;
+}
+
+.root[data-state="open"] .panel {
+  grid-template-rows: 1fr;
+}
+
+.viewport {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s linear 190ms;
+}
+
+.root[data-state="open"] .viewport {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.chevron {
+  transition: transform 190ms ease-out;
+}
+
+.root[data-state="open"] .chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .viewport,
+  .chevron {
+    transition: none;
+  }
+
+  .root[data-state="open"] .chevron {
+    transform: none;
+  }
+}

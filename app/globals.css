@@ -978,3 +978,61 @@
     transform: none;
   }
 }
+
+/* Only newly submitted messages opt into entry motion. */
+@keyframes workbench-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .workbench-message[data-entering="true"] {
+    animation: workbench-message-enter 160ms ease-out;
+  }
+  .workbench-composer-action {
+    transition:
+      transform 100ms ease-out,
+      background-color 100ms ease-out;
+  }
+  .workbench-composer-action:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .workbench-run-status {
+    transition:
+      color 140ms ease-out,
+      background-color 140ms ease-out,
+      border-color 140ms ease-out;
+  }
+}
+
+.workbench-run-status[data-run-status="running"] {
+  color: var(--color-info-fg);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-bg);
+}
+.workbench-run-status[data-run-status="awaiting_confirmation"],
+.workbench-run-status[data-run-status="partial"] {
+  color: var(--color-warning-fg);
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-bg);
+}
+.workbench-run-status[data-run-status="completed"] {
+  color: var(--color-success-fg);
+  background: var(--color-success-bg);
+  border-color: var(--color-success-bg);
+}
+.workbench-run-status[data-run-status="failed"] {
+  color: var(--color-error-fg);
+  background: var(--color-error-bg);
+  border-color: var(--color-error-bg);
+  transition: none;
+}
+.workbench-run-status[data-run-status="cancelled"] {
+  transition: none;
+}

@@ -115,6 +115,7 @@ describe("bounded Agent collaboration runtime", () => {
     ).runReadOnlySpecialists(OPPORTUNITY_REVIEW_PLAN, tasks(), new AbortController().signal);
 
     expect(outcome.status).toBe("complete");
+    expect(outcome.governance).toBeNull();
     expect(outcome.results).toHaveLength(3);
     expect(outcome.usage).toMatchObject({ toolCalls: 6, modelTurns: 6 });
     expect(maxActive).toBeGreaterThan(1);
@@ -294,6 +295,21 @@ describe("bounded Agent collaboration runtime", () => {
         expect.objectContaining({ code: "stale_state", field: "lead:lead-1" }),
       ]),
     );
+    expect(outcome.governance).toMatchObject({
+      hook: "parent_governance",
+      action: "ask",
+      actions: ["ask", "stop_writes", "mark_unresolved"],
+      writes: "stopped",
+      unresolved: true,
+    });
+    expect(outcome.governance?.question ?? "").not.toMatch(/hash-a|hash-b/);
+    const conflictEvents = store.events.filter((event) => event.type === "collaboration_conflict");
+    expect(conflictEvents.every((event) => event.payload.governance === "ask" && event.payload.writes === "stopped")).toBe(true);
+    expect(store.events.find((event) => event.type === "collaboration_completed")?.payload).toMatchObject({
+      governance: "ask",
+      writes: "stopped",
+      unresolved: true,
+    });
   });
 });
 

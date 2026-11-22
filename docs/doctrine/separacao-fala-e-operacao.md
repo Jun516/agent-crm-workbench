@@ -9,7 +9,7 @@
 > **O passo 1 está fechado com número** (2026-08-05, `gpt-5.6-terra`, 18 turnos, gate desarmado):
 > **30,0% de vazamento com prompt de operador · 0,0% com prompt de atendimento.** A hipótese
 > central — o vazamento é condicional ao prompt — se confirma.
-> Relatório: [`evidence/ia-360-w4/medicao-vazamento/RELATORIO.md`](../../evidence/ia-360-w4/medicao-vazamento/RELATORIO.md).
+> O relatório original é um artefato local. Veja a [política de publicação de evidências](../../evidence/README.md).
 
 ---
 

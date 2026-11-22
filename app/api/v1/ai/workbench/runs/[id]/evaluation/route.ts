@@ -11,7 +11,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { loadAgentVersionConfig } from "@/lib/agent-engine/agent/agent-config";
 import { requestTurnDeps } from "@/lib/agent-engine/agent/request-deps";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
+import { loadMemoryEvaluationRecalls } from "@/lib/ai/customer-memory/evaluation";
 import { BUILTIN_AGENTS } from "@/lib/ai/agents/builtins";
+import { EXPERT_CONFLICT_UNRESOLVED } from "@/lib/ai/agents/expert-conflict-governance";
 import { parseRuntimeMessages } from "@/lib/ai/agents/workbench-state";
 import type { AgentEvalReport, AgentEvalRunInput } from "@/lib/ai/evals/contracts";
 import { resolveAgentEvalProfile } from "@/lib/ai/evals/profiles";
@@ -27,6 +29,7 @@ import {
   jevModelIsPinned,
   readJevConfiguration,
   jevAuthorizationFingerprint,
+  type JevAuthorizedEvidence,
 } from "@/lib/ai/evals/jev-judge";
 import { loadWorkbenchObservedEvidence } from "@/lib/ai/agents/workbench-observed-evidence";
 import { observedKnowledgeEvidence } from "@/lib/ai/knowledge/evidence";
@@ -80,7 +83,7 @@ async function loadEvaluationMaterial(
   const { data: run, error: runError } = await admin
     .from("ai_workbench_runs")
     .select(
-      "id, agent_id, task, mode, status, final_text, result_document, created_at, started_at, updated_at, runtime_state, scope",
+      "id, agent_id, task, mode, status, error_code, final_text, result_document, created_at, started_at, updated_at, runtime_state, scope",
     )
     .eq("organization_id", organizationId)
     .eq("id", runId)
@@ -160,7 +163,23 @@ async function loadEvaluationMaterial(
   const [{ data: childStates }, { data: childEvents }] = childMaterials;
   if ((childStates ?? []).some((child) => !parseRuntimeMessages(child.messages)))
     throw new EvaluationMaterialError("state_corrupt", "专家运行状态无法安全解析。");
-  if (!state && ["completed", "partial"].includes(run.status))
+  // An explicit governance stop precedes parent model execution. Require both
+  // durable events and no proposal or model decision before treating absence as expected.
+  const governedPreModelStop =
+    run.status === "partial" &&
+    run.error_code === EXPERT_CONFLICT_UNRESOLVED &&
+    !(proposals ?? []).length &&
+    (events ?? []).some((event) =>
+      event.event_type === "run_partial" &&
+      (event.payload as Record<string, unknown> | null)?.reason === EXPERT_CONFLICT_UNRESOLVED,
+    ) &&
+    (events ?? []).some((event) => {
+      const payload = event.payload as Record<string, unknown> | null;
+      return event.event_type === "collaboration_conflict" &&
+        payload?.writes === "stopped" && payload.unresolved === true;
+    }) &&
+    !(events ?? []).some((event) => event.event_type === "model_decision");
+  if (!state && ["completed", "partial"].includes(run.status) && !governedPreModelStop)
     throw new EvaluationMaterialError(
       "state_corrupt",
       "已结束运行缺少持久化模型观察，无法给出可信评分。",
@@ -179,9 +198,11 @@ async function loadEvaluationMaterial(
     ...(parsedRootMessages ?? []),
     ...(childStates ?? []).flatMap((child) => parseRuntimeMessages(child.messages) ?? []),
   ];
+  const scope = z.object({ contactId: z.uuid().nullish() }).safeParse(run.scope);
   const contactIds = [
-    ...new Set(
-      runtimeMessages.flatMap((message) => {
+    ...new Set([
+      ...(scope.success && scope.data.contactId ? [scope.data.contactId] : []),
+      ...runtimeMessages.flatMap((message) => {
         if (message.role !== "tool" || message.toolName !== "crm_get_contact" || message.isError)
           return [];
         try {
@@ -200,24 +221,46 @@ async function loadEvaluationMaterial(
           return [];
         }
       }),
-    ),
+    ]),
   ];
   if (contactIds.length > 50)
     throw new EvaluationMaterialError("read_failed", "记忆覆盖校验超出安全读取上限。");
   let confirmedMemoryExpectations: AgentEvalRunInput["confirmedMemoryExpectations"] = [];
+  let memoryEvaluationRecalls: NonNullable<AgentEvalRunInput["memoryEvaluationRecalls"]> = [];
+  let observedContactIds = contactIds;
   if (contactIds.length) {
+    try {
+      memoryEvaluationRecalls = await loadMemoryEvaluationRecalls(
+        getRequestPool(),
+        organizationId,
+        [run.id, ...(collaborationRuns ?? []).map((child) => child.id)],
+      );
+    } catch {
+      throw new EvaluationMaterialError("read_failed", "无法独立核对记忆读取回执。");
+    }
+    observedContactIds = [
+      ...new Set([...contactIds, ...memoryEvaluationRecalls.map((receipt) => receipt.contact_id)]),
+    ];
+    if (observedContactIds.length > 50)
+      throw new EvaluationMaterialError("read_failed", "记忆覆盖校验超出安全读取上限。");
     // Only facts present throughout this run count. Later additions/deletions
     // cannot manufacture a historical failure. Current privacy always wins.
     const contacts = await admin
       .from("contacts")
       .select("id")
       .eq("organization_id", organizationId)
-      .in("id", contactIds)
+      .in("id", observedContactIds)
       .eq("is_anonymized", false)
       .is("is_merged_into", null);
     if (contacts.error)
       throw new EvaluationMaterialError("read_failed", "无法独立校验客户记忆作用域。");
-    const allowed = (contacts.data ?? []).map((contact) => contact.id);
+    const currentContacts = new Set((contacts.data ?? []).map((contact) => contact.id));
+    memoryEvaluationRecalls = memoryEvaluationRecalls.filter((receipt) =>
+      currentContacts.has(receipt.contact_id),
+    );
+    const recalledContacts = new Set(memoryEvaluationRecalls.map((receipt) => receipt.contact_id));
+    const observed = new Set(contactIds);
+    const allowed = [...currentContacts].filter((id) => observed.has(id) && !recalledContacts.has(id));
     if (allowed.length) {
       const memories = await admin
         .from("ai_customer_memories")
@@ -276,6 +319,7 @@ async function loadEvaluationMaterial(
     })),
     runtimeMessages,
     confirmedMemoryExpectations,
+    memoryEvaluationRecalls,
     collaborationRuns: (collaborationRuns ?? []).map((child) => ({
       id: child.id,
       specialistKey: child.specialist_key,
@@ -301,6 +345,7 @@ async function loadEvaluationMaterial(
         collaborationRuns,
         runtimeMessages,
         confirmedMemoryExpectations,
+        ...(memoryEvaluationRecalls.length ? { memoryEvaluationRecalls } : {}),
         profile: { key: profile.key, revision: profile.revision },
       }),
     )
@@ -315,7 +360,7 @@ async function loadEvaluationMaterial(
     baseFingerprint,
     versionId: typeof runtimeState.versionId === "string" ? runtimeState.versionId : null,
     scope: run.scope,
-    observedContactIds: contactIds,
+    observedContactIds,
   };
 }
 
@@ -346,6 +391,45 @@ async function assertJevPrivacy(admin: Admin, org: string, material: EvaluationM
     .eq("is_anonymized", false)
     .is("is_merged_into", null);
   if (error || data?.length !== contacts.length) throw new Error("jev_contact_unavailable");
+}
+
+async function readApprovedJevKnowledge(
+  admin: Admin,
+  organizationId: string,
+  material: EvaluationMaterial,
+): Promise<JevAuthorizedEvidence[]> {
+  if (!observedKnowledgeEvidence(material.input.runtimeMessages).length) return [];
+  const evidence = await loadWorkbenchObservedEvidence(admin, {
+    organizationId,
+    agentId: material.input.agentId,
+    runIds: [
+      material.input.runId,
+      ...(material.input.collaborationRuns ?? []).map((child) => child.id),
+    ],
+  });
+  return evidence
+    .filter((item) => item.namespace === "organization_memory" || item.index_status === "current")
+    .map(({ id, namespace, revision, title, excerpt }) => ({ id, namespace, revision, title, excerpt }));
+}
+
+async function reauthorizeSavedJevReview(
+  admin: Admin,
+  organizationId: string,
+  material: EvaluationMaterial,
+  report: AgentEvalReport,
+): Promise<AgentEvalReport | null> {
+  const judge = report.semanticJudge;
+  const fingerprint = judge.choiceReview?.authorizationFingerprint ?? judge.authorizationFingerprint;
+  if (!fingerprint) return null;
+  try {
+    await assertJevPrivacy(admin, organizationId, material);
+    const approvedKnowledge = await readApprovedJevKnowledge(admin, organizationId, material);
+    if (jevAuthorizationFingerprint(approvedKnowledge) !== fingerprint) return null;
+    await assertJevPrivacy(admin, organizationId, material);
+    return report;
+  } catch {
+    return null;
+  }
 }
 
 function evaluationFingerprint(base: string, evaluator: string): string {
@@ -421,12 +505,15 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     baseFingerprint: material.baseFingerprint,
     rubricRevision: WORKBENCH_SEMANTIC_RUBRIC_REVISION,
   });
-  const savedJevEvaluation = matchingSavedJevReview(saved.data ?? [], {
+  const matchedJevEvaluation = matchingSavedJevReview(saved.data ?? [], {
     runId: id,
     profileKey: material.profile.key,
     profileRevision: material.profile.revision,
     baseFingerprint: material.baseFingerprint,
   });
+  const savedJevEvaluation = matchedJevEvaluation
+    ? await reauthorizeSavedJevReview(admin, authz.org.orgId, material, matchedJevEvaluation)
+    : null;
   return ok(
     {
       ...report,
@@ -504,34 +591,18 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
         { requestId },
       );
     }
-    const historical = observedKnowledgeEvidence(material.input.runtimeMessages);
-    const readApprovedKnowledge = async () =>
-      historical.length
-        ? await loadWorkbenchObservedEvidence(admin, {
-            organizationId: authz.org.orgId,
-            agentId: material.input.agentId,
-            runIds: [id, ...(material.input.collaborationRuns ?? []).map((child) => child.id)],
-          })
-            .then((evidence) =>
-              evidence
-                .filter(
-                  (item) =>
-                    item.namespace === "organization_memory" || item.index_status === "current",
-                )
-                .map((item) => ({
-                  id: item.id,
-                  namespace: item.namespace,
-                  revision: item.revision,
-                  title: item.title,
-                  excerpt: item.excerpt,
-                })),
-            )
-            .catch(() => [])
-        : [];
-    const approvedKnowledge = await readApprovedKnowledge();
-    const authorizationFingerprint = jevAuthorizationFingerprint(approvedKnowledge);
+    let authorizationFingerprint: string;
+    try {
+      const approvedKnowledge = await readApprovedJevKnowledge(admin, authz.org.orgId, material);
+      authorizationFingerprint = jevAuthorizationFingerprint(approvedKnowledge);
+    } catch {
+      return fail("jev_scope_unavailable", "无法核对当前知识权限，不能外送历史材料。", 409, {
+        requestId,
+      });
+    }
     const evaluatorKey = jevEvaluatorKey(config.model, config.model, authorizationFingerprint);
     const stableFingerprint = evaluationFingerprint(material.baseFingerprint, evaluatorKey);
+    let matching: AgentEvalReport | null = null;
     // Aliases can resolve to a new model version. Never reuse them without a request.
     if (jevModelIsPinned(config.model)) {
       const { data: cached, error: cacheError } = await admin
@@ -545,48 +616,39 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
         .maybeSingle();
       if (cacheError)
         return fail("evaluation_read_failed", "无法核对 Jev 评测缓存。", 503, { requestId });
-      const matching =
-        cached?.report &&
-        matchingSavedJevReview([{ report: cached.report, input_fingerprint: stableFingerprint }], {
-          runId: id,
-          profileKey: material.profile.key,
-          profileRevision: material.profile.revision,
-          baseFingerprint: material.baseFingerprint,
-        });
-      if (matching) {
-        try {
-          await assertJevPrivacy(admin, authz.org.orgId, material);
-        } catch {
-          return fail(
-            "jev_scope_unavailable",
-            "评测对象的隐私状态已变化，不能继续使用历史评测。",
-            409,
-            { requestId },
-          );
-        }
-        return ok(
-          { ...matching, inputFingerprint: stableFingerprint, cached: true },
-          { requestId },
+      if (cached?.report) {
+        matching = matchingSavedJevReview(
+          [{ report: cached.report, input_fingerprint: stableFingerprint }],
+          {
+            runId: id,
+            profileKey: material.profile.key,
+            profileRevision: material.profile.revision,
+            baseFingerprint: material.baseFingerprint,
+          },
         );
       }
     }
+
+    let currentKnowledge: JevAuthorizedEvidence[];
     try {
+      currentKnowledge = await readApprovedJevKnowledge(admin, authz.org.orgId, material);
+      if (jevAuthorizationFingerprint(currentKnowledge) !== authorizationFingerprint)
+        return fail(
+          "jev_scope_unavailable",
+          "知识来源权限或版本在等待中变化，请核对后重新评测。",
+          409,
+          { requestId },
+        );
+      // Authority checks can await remote knowledge. Recheck contact privacy
+      // after that wait and immediately before returning or sending material.
       await assertJevPrivacy(admin, authz.org.orgId, material);
     } catch {
-      return fail("jev_scope_unavailable", "评测对象的隐私状态已变化，不能外送历史材料。", 409, {
+      return fail("jev_scope_unavailable", "无法核对当前知识权限或隐私状态。", 409, {
         requestId,
       });
     }
-    // Cache/privacy reads above can wait. Do not external-send the knowledge
-    // projection authorized before those waits if its current authority changed.
-    const currentKnowledge = await readApprovedKnowledge();
-    if (jevAuthorizationFingerprint(currentKnowledge) !== authorizationFingerprint)
-      return fail(
-        "jev_scope_unavailable",
-        "知识来源权限或版本在等待中变化，请核对后重新评测。",
-        409,
-        { requestId },
-      );
+    if (matching)
+      return ok({ ...matching, inputFingerprint: stableFingerprint, cached: true }, { requestId });
     const report = await runAgentEvaluation({
       run: material.input,
       profile: material.profile,

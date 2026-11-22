@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,47 +9,23 @@ import {
 import { detectarVazamentoInterno } from "@/lib/agent-engine/guardrails/vazamento-interno";
 import type { LeadContext } from "@/lib/agent-engine/edge/crm/get-lead-context";
 
-/**
- * A projeção (spec 16 §4) — a camada que fecha a TERCEIRA porta de vazamento.
- *
- * ═══ POR QUE ESTE ARQUIVO LÊ `evidence/` ═══
- *
- * Os payloads abaixo não foram inventados por quem escreveu o teste: são os
- * turnos REAIS de `gpt-5.6-terra` da medição de 2026-08-05, versionados em
- * `evidence/ia-360-w4/medicao-vazamento/turnos/`. Fixture inventada mede a
- * imaginação de quem a escreveu — e a imaginação de quem escreve a defesa é
- * justamente a que já falhou, senão o defeito não teria acontecido.
- *
- * Se os arquivos sumirem, os casos que dependem deles FALHAM em vez de sumirem
- * em silêncio (ver `carregarTurno`): um teste que se auto-desliga quando perde o
- * insumo é pior que teste nenhum, porque continua reportando verde.
- */
-const DIR_TURNOS = path.join(
-  process.cwd(),
-  "evidence/ia-360-w4/medicao-vazamento/turnos",
-);
-
-interface TurnoMedido {
-  cenario: string;
-  final_text: string;
-  tool_calls: Array<{ tool_calls?: Array<{ tool_name: string; result: unknown }> }>;
-}
-
-function carregarTurno(arquivo: string): TurnoMedido {
-  const caminho = path.join(DIR_TURNOS, arquivo);
-  if (!fs.existsSync(caminho)) {
-    throw new Error(
-      `evidência ausente: ${caminho}. Estes casos medem a projeção contra turnos REAIS; ` +
-        `sem o arquivo o teste não tem o que medir e deve falhar, não passar.`,
-    );
-  }
-  return JSON.parse(fs.readFileSync(caminho, "utf-8")) as TurnoMedido;
-}
-
-/** Todo `result` de ferramenta que o modelo recebeu naquele turno. */
-function resultadosDeFerramenta(turno: TurnoMedido): unknown[] {
-  return turno.tool_calls.flatMap((passo) => (passo.tool_calls ?? []).map((c) => c.result));
-}
+// Recortes dos resultados de ferramenta dos cenários 7 e 9 da medição de
+// 2026-08-05 (spec 16 §4). Mantêm os campos e o aninhamento do vazamento com
+// identificadores fictícios, para testar a regressão em um clone público.
+const RESULTADOS_AUTOMACAO = [
+  { regras: [{ id: "00000000-0000-4000-8000-000000000001" }] },
+  {
+    execucoes: [
+      {
+        id: "00000000-0000-4000-8000-000000000002",
+        falhas: [{ erro: "unsafe_url:https_required" }],
+      },
+    ],
+  },
+];
+const RESULTADOS_PERMISSOES = [
+  { time: [{ user_id: "00000000-0000-4000-8000-000000000003" }] },
+];
 
 const RE_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -223,30 +196,25 @@ describe("projeção — o que o Conversador pode ver", () => {
     });
   });
 
-  describe("contra os turnos REAIS que vazaram (evidence/)", () => {
+  describe("regressões observadas nos turnos medidos", () => {
     it("o payload que produziu 'unsafe_url:https_required' sai limpo depois da projeção", () => {
-      const turno = carregarTurno("operador__7-automacoes-e-falhas.json");
-      // Primeiro: a evidência é o que eu penso que é. Sem este controle, um
-      // arquivo trocado faria o caso passar sem medir nada.
-      const cruJson = JSON.stringify(resultadosDeFerramenta(turno));
-      expect(cruJson, "controle: o payload real deve conter o erro cru").toContain("unsafe_url:https_required");
+      const cruJson = JSON.stringify(RESULTADOS_AUTOMACAO);
+      expect(cruJson, "controle: o payload deve conter o erro cru").toContain("unsafe_url:https_required");
 
-      const projetadoJson = JSON.stringify(projetarRetornoDeTool(resultadosDeFerramenta(turno)));
+      const projetadoJson = JSON.stringify(projetarRetornoDeTool(RESULTADOS_AUTOMACAO));
       expect(projetadoJson).not.toContain("unsafe_url");
       expect(projetadoJson).not.toContain("https_required");
       expect(projetadoJson).toContain("não usa conexão segura");
     });
 
     it("os UUIDs que o mesmo turno trazia não sobrevivem", () => {
-      const turno = carregarTurno("operador__7-automacoes-e-falhas.json");
-      expect(JSON.stringify(resultadosDeFerramenta(turno)), "controle").toMatch(RE_UUID);
-      expect(JSON.stringify(projetarRetornoDeTool(resultadosDeFerramenta(turno)))).not.toMatch(RE_UUID);
+      expect(JSON.stringify(RESULTADOS_AUTOMACAO), "controle").toMatch(RE_UUID);
+      expect(JSON.stringify(projetarRetornoDeTool(RESULTADOS_AUTOMACAO))).not.toMatch(RE_UUID);
     });
 
     it("o turno que despejou UUID de usuário na tela do cliente sai sem nenhum", () => {
-      const turno = carregarTurno("operador__9-quem-pode-mexer.json");
-      expect(JSON.stringify(resultadosDeFerramenta(turno)), "controle").toMatch(RE_UUID);
-      expect(JSON.stringify(projetarRetornoDeTool(resultadosDeFerramenta(turno)))).not.toMatch(RE_UUID);
+      expect(JSON.stringify(RESULTADOS_PERMISSOES), "controle").toMatch(RE_UUID);
+      expect(JSON.stringify(projetarRetornoDeTool(RESULTADOS_PERMISSOES))).not.toMatch(RE_UUID);
     });
   });
 });

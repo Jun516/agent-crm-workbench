@@ -375,6 +375,7 @@ class PiWorkbenchSpecialistExecutor implements AgentSpecialistExecutor {
     private readonly deps: TurnDeps,
     private readonly root: RootRunMetadata,
     private readonly agentConfig: PublishedAgentConfig,
+    private readonly customerMemoryBeforeRead?: () => Promise<void>,
   ) {}
 
   async execute(input: Parameters<AgentSpecialistExecutor["execute"]>[0]) {
@@ -408,6 +409,17 @@ class PiWorkbenchSpecialistExecutor implements AgentSpecialistExecutor {
           llmCfg: this.deps.llmCfg,
           log: this.deps.log,
           runtime: this.deps.runtime,
+          ...(this.customerMemoryBeforeRead && this.root.scope.contactId
+            ? {
+                customerMemory: {
+                  contactId: this.root.scope.contactId,
+                  conversationId: this.root.scope.conversationId,
+                  leadId: this.root.scope.leadId,
+                  task: this.root.task,
+                  beforeRead: this.customerMemoryBeforeRead,
+                },
+              }
+            : {}),
         },
         {
           tenantId: this.root.organizationId,
@@ -559,6 +571,8 @@ export async function runWorkbenchCollaboration(input: {
   plan: AgentCollaborationPlan;
   root: RootRunMetadata;
   agentConfig: PublishedAgentConfig;
+  // Refinement uses this executor for candidates without the automatic recall receipt path.
+  customerMemoryBeforeRead?: () => Promise<void>;
   signal: AbortSignal;
 }): Promise<AgentCollaborationOutcome> {
   const tasks = input.plan.specialists.map<AgentSpecialistTask>((specialist) => ({
@@ -577,7 +591,13 @@ export async function runWorkbenchCollaboration(input: {
   }));
   const runtime = new BoundedAgentCollaborationRuntime(
     new SupabaseCollaborationStore(input.admin, input.root),
-    new PiWorkbenchSpecialistExecutor(input.admin, input.deps, input.root, input.agentConfig),
+    new PiWorkbenchSpecialistExecutor(
+      input.admin,
+      input.deps,
+      input.root,
+      input.agentConfig,
+      input.customerMemoryBeforeRead,
+    ),
   );
   return runtime.runReadOnlySpecialists(input.plan, tasks, input.signal);
 }

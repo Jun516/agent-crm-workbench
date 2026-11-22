@@ -1,5 +1,7 @@
 # Waves 1 e 2 — DevVivo · 2026-07-24
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Wave 1 (CORE 1 — a IA é dona do negócio) abaixo; **Wave 2 (o slot) no fim do arquivo.**
 
 # Wave 1 — CORE 1: a IA é dona do negócio · 2026-07-24 · implementação concluída
@@ -44,11 +46,11 @@ Instância própria do Playwright (o browser MCP estava com o QA), dev server da
 
 | # | Cenário | Resultado | Evidência |
 |---|---|---|---|
-| A | Atribuir lead a agente pelo menu do card | Card passa de "Sem responsável" para `LA · Lia — AgendaPlus` | `wave-1-devvivo-dono-agente.png`, `wave-1-devvivo-card-agente.png` |
+| A | Atribuir lead a agente pelo menu do card | Card passa de "Sem responsável" para `LA · Lia — AgendaPlus` | wave-1-devvivo-dono-agente.png, wave-1-devvivo-card-agente.png |
 | B | Agente é par do humano | avatar **24×24px** (igual ao humano), `font-family: IBM Plex Mono`, `background: rgba(0,0,0,0)` (vazado), `border 1px` + ring; sem emoji, sem badge "AI" | medido por `getComputedStyle`, não a olho |
 | C | Tooltip nome · versão | `Lia — AgendaPlus · v24` (versão **publicada hoje**, resolvida por join) | log da prova |
-| D | Transferência de volta | Volta a "Sem responsável" e persiste | `wave-1-devvivo-revertido.png` |
-| E | Board inteiro | Humanos (`EM`, `EA` preenchidos) e agentes (`LA`, `BE` vazados) lado a lado | `wave-1-devvivo-dono-agente.png` |
+| D | Transferência de volta | Volta a "Sem responsável" e persiste | wave-1-devvivo-revertido.png |
+| E | Board inteiro | Humanos (`EM`, `EA` preenchidos) e agentes (`LA`, `BE` vazados) lado a lado | wave-1-devvivo-dono-agente.png |
 
 Screenshots em `/private/tmp/claude-501/-Users-helsome-pi-native-crm/9579c957-fb23-4342-9df1-c208137c2c03/scratchpad/` (não escrevi em `evidence/`, que é do QA — copiar para lá se quiser referenciar no handoff oficial).
 
@@ -190,7 +192,7 @@ e `update` (re-aplicação) verdes — o gate do item 7 da doutrina de migration
 | 8 tags | 3 tags + "+5" no card | empurrava o rodapé | fora do card, no hover |
 | Tag canônica | — | — | ponto de 6px ao lado do título |
 
-Screenshot: `evidence/wave-2-devvivo-board.png` (11 cards, 4 colunas).
+Screenshot: evidence/wave-2-devvivo-board.png (11 cards, 4 colunas).
 
 **Como o `nested-interactive` morreu:** o handle de arraste do dnd marca o card como
 `role="button"`, e o menu de ações é outro botão dentro dele. Troquei o papel do container

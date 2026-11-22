@@ -14,10 +14,8 @@ Sentry.init({
 
   // No Sentry da comunidade, só erro (issue #100). Ver isCommunityDsn().
   tracesSampleRate: community ? 0 : 1,
-  enableLogs: true,
-  sendDefaultPii: false,
-
   ...sentryScrubHooks,
+  beforeSendSpan: Sentry.withStaticSpan(sentryScrubHooks.beforeSendSpan),
 });
 
 // Transparência de telemetria: uma linha no boot dizendo o que está ativo e como

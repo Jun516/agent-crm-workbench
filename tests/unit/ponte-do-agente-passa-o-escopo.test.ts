@@ -79,7 +79,8 @@ describe("todo montador de ferramentas do turno passa o escopo", () => {
   it("nenhum deles esquece `pipelineIds`", () => {
     const esquecidos = CHAMADORES.filter((arquivo) => {
       const fonte = readFileSync(resolve(RAIZ, arquivo), "utf8");
-      return !/pipelineIds:/.test(fonte);
+      const montagem = /pickToolsFromMcp\(\{([\s\S]*?)\}\)/.exec(fonte)?.[1] ?? "";
+      return !/^\s*pipelineIds\s*[:,]/m.test(montagem);
     });
     expect(
       esquecidos,

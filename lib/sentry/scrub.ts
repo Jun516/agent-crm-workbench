@@ -145,11 +145,27 @@ function scrubEventUrls<T extends EventLike>(event: T): T {
 }
 
 /**
- * Os quatro hooks, prontos para espalhar dentro do `Sentry.init` de cada runtime.
- * Espalhar o objeto inteiro é o ponto: adicionar um hook aqui cobre servidor, edge
- * e cliente de uma vez, sem depender de alguém lembrar dos três arquivos.
+ * Política de coleta e scrub compartilhada por todos os runtimes.
+ * Cada inicialização envolve `beforeSendSpan` com `Sentry.withStaticSpan`
+ * para que o SDK v11 aplique o hook a spans do ciclo estático.
  */
 export const sentryScrubHooks = {
+  traceLifecycle: "static" as const,
+  dataCollection: {
+    userInfo: false,
+    cookies: false,
+    httpHeaders: {
+      request: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+      response: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    },
+    httpBodies: [],
+    urlQueryParams: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    genAI: { inputs: false, outputs: false },
+    databaseQueryData: false,
+    queues: false,
+    graphQL: { document: false, variables: false },
+  },
+
   beforeSend<T extends EventLike>(event: T): T {
     scrubEventUrls(event);
     if (typeof event.message === "string") {

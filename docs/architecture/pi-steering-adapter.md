@@ -2,18 +2,18 @@
 
 真实任务：给定正在执行的商机 Mission 和负责人补充的方向，负责人希望智能体在下一次可安全决策时改变计划；只有新方向被纳入模型上下文、旧计划的业务动作不再被误执行，才算生效。
 
-此文档锚定仓库锁定的 `@earendil-works/pi-agent-core@0.86.1`。`pi-coding-agent` 技能中的 `AgentSession.steer()` 示例基于 `0.84.2` 的另一个包，不作为本项目的 API 依据。实际签名和时序来自本地 `node_modules/@earendil-works/pi-agent-core/dist/agent.d.ts`、`dist/agent.js` 与 `dist/agent-loop.js`。
+此文档使用仓库锁定的 `@earendil-works/pi-agent-core@1.3.0`。SDK 的声明和执行时序见 `node_modules/@earendil-works/pi-agent-core/dist/agent.d.ts`、`dist/types.d.ts`、`dist/agent.js` 和 `dist/agent-loop.js`。
 
 ## 产品端口与 Pi 映射
 
 | CRM 语义 | 当前 Pi 落点 | 约束 |
 | --- | --- | --- |
-| 负责人方向 ID 与正文 | `AgentTurnInput.steering.poll()` 返回产品自有消息 | 首次模型请求前、此后每个可继续的 `turn_end` 轮询；ID 用于本次模型调用去重，源数据不得在轮询时破坏性消费。 |
-| 运行中插话 | 调用 `Agent.steer(userMessage)` | Pi 在本轮工具结果之后、下轮模型请求之前读取队列；不能撤销已执行工具。 |
+| 负责人方向 ID 与正文 | `AgentTurnInput.steering.poll()` 返回产品自有消息 | 首次模型请求前轮询。后续 `turn_end` 在硬轮数预算尚有余额时轮询。ID 用于本次模型调用去重，命令源保留尚未确认消费的方向。 |
+| 运行中插话 | 调用 `Agent.steer(userMessage)` | Pi 在 `finishTurn` 和 `turn_end` 回调结束后读取队列，收到停止决定时结束当前执行。排队发生在本轮工具已经执行之后。 |
 | 模型上下文 | Pi 把带稳定方向 ID 标记的 steering user message 写入 transcript | `steering_queued` 只证明入队；`steering_consumed` 要求消息通过 `transformContext`、进入模型请求且下一轮有非错误响应，事件不含正文。业务层仍须将 transcript 与确认原子持久化，才可声称指令生效。 |
 | 新 Run 的方向消费证明 | CRM 在模型调用时传入私有 `contextProbe`（方向修订 ID 与序列化正文） | Pi 的 `convertToLlm` 位于 `transformContext` 之后、实际 provider 请求之前；仅当最终 user 消息包含探针文本且该回合非错误结束，适配器才发出不含正文的 `model_context_consumed`。CRM 再把此事件与私有消息状态及 Mission 回执原子提交。 |
 | 工具调用 | 仍由 CRM `beforeToolCall`、工具效果策略和数据库发送闸门控制 | `crm_update_lead` 自动执行时取得 Mission 方向事务锁，核对 Run 保存的修订；负责人方向提交也先取得同一把锁。新方向不是批准外发或提升工具权限。 |
-| 停止、预算、取消 | `shouldStopAfterTurn`、`maxTurns`、`abortSignal` 仍优先 | Pi 在 `shouldStopAfterTurn` 请求停止时不读取 steer；调用方必须把未消费命令保留为待处理。 |
+| 停止、预算、取消 | `finishTurn` 调用 CRM 的 `shouldStopAfterTurn` 并检查 `maxTurns`，`abortSignal` 传播取消 | `finishTurn` 返回 `{ action: "end" }` 时，Pi 等待 `turn_end` 后结束。已排队且未获消费回执的命令保留为待处理。 |
 
 适配层不持有 Mission 业务状态，不从模型文本推断负责人身份，也不对方向作成功确认。运行中方向的产品闭环仍须：可信负责人命令原子暂停旧客户发送、持久化方向修订；每个 CRM 写入前检查修订；在 Pi 下一轮注入；将带方向的 transcript 与消费修订原子保存；进程退出后重放尚未被持久化消费的命令。若运行在边界前结束或预算耗尽，命令应保持待处理并由 Mission 恢复机制接管，不能标记为已生效。
 

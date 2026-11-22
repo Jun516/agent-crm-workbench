@@ -346,7 +346,9 @@ test("uma extensão de duas portas: a tela diz quais são, e cada botão leva à
   // O card no hub tem identificador próprio — buscar pelo TEXTO do manifesto é frágil por
   // dois motivos: o texto é do pacote (muda com ele) e pode casar com outro lugar da página.
   await page.goto("/app/crm");
-  const cardHub = page.getByTestId(`extension-contribution-${instalacaoId}-falar-com-quem-espera`);
+  const cardHub = page
+    .getByTestId(`extension-contribution-${instalacaoId}-falar-com-quem-espera`)
+    .filter({ visible: true });
   await expect(cardHub).toBeVisible({ timeout: 30_000 });
   await expect(cardHub).toContainText("Falar com quem está esperando");
   await cardHub.click();

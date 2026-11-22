@@ -328,17 +328,22 @@ describe("Mem0 controlled real service paths", () => {
     vi.stubEnv("AI_INTEGRATION_BINDINGS", "");
     const f = memoryFixture();
     const prior = f.query.getMockImplementation()!;
-    let factReads = 0;
+    let completedLocalReads = 0;
     f.query.mockImplementation(async (query, values) => {
       const sql = typeof query === "string" ? query : query.text;
       const result = await prior(query, values);
-      if (sql.includes("select * from ai_customer_memories") && ++factReads === 2) f.unavailable();
+      // The locked-facts query now finishes each local read, including the
+      // final re-read immediately before the privacy check.
+      if (sql.includes("from ai_customer_memories") && sql.includes("locked=true")) {
+        completedLocalReads += 1;
+        if (completedLocalReads === 2) f.unavailable();
+      }
       return result;
     });
     await expect(readConfirmedCustomerMemory(f.pool, org, contact)).rejects.toThrow(
       "customer_memory_contact_unavailable",
     );
-    expect(factReads).toBe(2);
+    expect(completedLocalReads).toBe(2);
   });
   it("writes infer:false once, verifies ownership and replays without duplicate creation", async () => {
     const f = memoryFixture();

@@ -165,6 +165,8 @@ export interface AgentTurnInput {
   ) => RuntimeMessage[] | Promise<RuntimeMessage[]>;
   /** In-memory proof only: never include userText in events or product traces. */
   contextProbe?: { id: string; userText: string };
+  /** Dynamic, body-free consumption proofs for the final transformed request. */
+  contextProbes?: (messages: RuntimeMessage[]) => Array<{ id: string; userText: string }>;
   beforeToolCall?: (input: {
     name: string;
     args: Record<string, unknown>;

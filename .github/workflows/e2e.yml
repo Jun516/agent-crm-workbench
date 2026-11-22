@@ -952,7 +952,6 @@ jobs:
         passagem-com-contexto.spec.ts
         interface-por-vinculo.spec.ts
         pipelines-gestao.spec.ts
-        qa-agente-usa-as-maos.spec.ts
         qa-selo-no-funil-usado.spec.ts
         qa-telas-descobertas-w4.spec.ts
         retorno-anti-morte.spec.ts
@@ -1085,6 +1084,11 @@ jobs:
       # Esta spec também usa o provider real da organização de demonstração
       # para validar submissão estruturada e assertivas de campos do CRM; o CI
       # compartilhado não deve chamá-lo nem gastar credenciais externas.
+      # qa-agente-usa-as-maos mede a escolha de ferramentas por um provedor real
+      # e usa crédito externo. A stub do CI não mede esse comportamento.
+      # customer-memory-loop usa a pilha local WAHA e Redis e o usuário
+      # criado pelo bootstrap do cenário especializado de memória.
+      # agent-workbench-ontology usa um worker ativo e um provedor local determinístico.
       FORA_DO_CI: >-
         inbox-tempo-real.spec.ts
         cadastro-sem-confirmacao-de-email.spec.ts
@@ -1094,6 +1098,9 @@ jobs:
         agent-multi-agent-eval-real-model.spec.ts
         agent-semantic-judge-real-model.spec.ts
         agent-workbench-structured-result-real-model.spec.ts
+        qa-agente-usa-as-maos.spec.ts
+        customer-memory-loop.spec.ts
+        agent-workbench-ontology.spec.ts
     steps:
       # ── O RELÓGIO DESTA PARTE: ONDE O TETO DE 30 MIN COMEÇA A CONTAR ──────
       #
@@ -1295,6 +1302,12 @@ jobs:
       # tabela que ainda não existe) — está no CLAUDE.md e foi confirmado neste
       # CI. O que o self-hoster aplica é o `baseline.sql`, então é ele que o
       # e2e aplica: o banco do teste fica igual ao de quem instalou o produto.
+      - name: Habilitar Mailpit para a parte com confirmação por e-mail
+        if: matrix.parte == 1
+        run: |
+          sed -i '/^\[inbucket\]/,/^\[/{s/^enabled = false$/enabled = true/;}' supabase/config.toml
+          sed -n '/^\[inbucket\]/,/^\[/p' supabase/config.toml | grep -qx 'enabled = true'
+
       - name: Subir Supabase local (sem a cadeia de migrations)
         run: |
           mv supabase/migrations /tmp/migrations-off

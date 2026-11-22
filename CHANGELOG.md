@@ -8,6 +8,8 @@ Se você roda o pi-native-crm numa VPS, **leia a seção da versão para a qual 
 
 ## [Não lançado]
 
+- 合并 Pi 1.3、客户记忆、Ontology、Mission 治理与动效，保留四项工作台定制。[验证与 0409–0414 迁移](docs/testing/verify-crm.md)
+
 - Para remover os guias auxiliares instalados por download, use `curl -fsSL <url-do-pi-native-crm>/scripts/instalar-guias.sh | bash -s -- --remover`.
 
 ## [1.41.0] — 2026-09-20

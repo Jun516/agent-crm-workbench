@@ -1,4 +1,10 @@
 import { followupProposalPreview } from "./workbench-proposal-preview";
+import { missionProposalScopeRefusal } from "@/lib/ontology/mission-semantics";
+import {
+  ontologyObjectScopeRefusal,
+  ontologyPipelineScope,
+  recordOntologyObservation,
+} from "@/lib/ai/agents/workbench-ontology-observation";
 import { composeSystemPrompt, loadOrgMemory, orgMemoryProvenance, renderOrgMemory } from "@/lib/agent-engine/agent/org-memory";
 import { appendWorkbenchEvent } from "@/lib/ai/agents/workbench-events";
 import {
@@ -151,13 +157,20 @@ export async function runResumedWorkbenchTurn(input: {
       type: "context_loaded",
       payload: { ...orgMemoryProvenance(orgMemory), memoryResolution: "current_published" },
     });
+    const ontologyPipelineIds = ontologyPipelineScope(input.scope);
     agentConfig.pipelineIds = input.scope.pipelineId ? [input.scope.pipelineId] : [];
     const mcp = await buildMcpTurnTools(
       deps.crmCfg,
       { organizationId, jobId: input.jobId },
       agentConfig,
       deps.log,
-      { readOnly: input.mode === "inspect", workbenchProposalTools: true },
+      {
+        readOnly: input.mode === "inspect",
+        workbenchProposalTools: true,
+        signal: abortController.signal,
+        ontologyPipelineIds,
+        workbenchRunId: runId,
+      },
     );
     const proposalInputs: Array<{ tool: string; arguments: unknown }> = [];
     const resultChannel = createWorkbenchResultChannel();
@@ -173,9 +186,29 @@ export async function runResumedWorkbenchTurn(input: {
       gatedTools[name] = {
         ...(definition as object),
         execute: async (args: unknown, options: unknown) => {
-          if (effect.effect === "read") return original.execute!(args, options);
+          if (effect.effect === "read") {
+            const result = ontologyObjectScopeRefusal(name, input.scope) ?? await original.execute!(args, options);
+            if (name.startsWith("ontology_")) {
+              await input.beforeSideEffect?.();
+              await recordOntologyObservation(admin, { organizationId, runId, tool: name, result });
+            }
+            return result;
+          }
           if (input.mode === "inspect")
             return { content: "Blocked by inspect-only policy; no CRM state was changed.", isError: true };
+          const scopeRefusal = missionProposalScopeRefusal(
+            input.missionId, input.scope.leadId, input.scope.contactId, input.scope.conversationId, name, args,
+          );
+          if (scopeRefusal) {
+            await input.beforeSideEffect?.();
+            await appendWorkbenchEvent(admin, {
+              organizationId,
+              runId,
+              type: "policy_checked",
+              payload: { tool: name, gate: "mission_scope", verdict: "denied", code: "mission_target_mismatch" },
+            });
+            return scopeRefusal;
+          }
           proposalInputs.push({ tool: name, arguments: args });
           return {
             content: effect.effect === "reversible_write"
@@ -210,7 +243,23 @@ export async function runResumedWorkbenchTurn(input: {
     if (SUBMIT_WORKBENCH_RESULT_TOOL in gatedTools)
       throw new Error("workbench_result_tool_name_collision");
     Object.assign(gatedTools, resultChannel.tools);
-    const modelDeps = { pool: getRequestPool(), llmCfg: deps.llmCfg, log: deps.log, runtime: deps.runtime };
+    const modelDeps = {
+      pool: getRequestPool(),
+      llmCfg: deps.llmCfg,
+      log: deps.log,
+      runtime: deps.runtime,
+      ...(input.runtimeState.refinement === undefined && input.scope.contactId
+        ? {
+            customerMemory: {
+              contactId: input.scope.contactId,
+              conversationId: input.scope.conversationId,
+              leadId: input.scope.leadId,
+              task: input.task,
+              beforeRead: input.beforeSideEffect,
+            },
+          }
+        : {}),
+    };
     const contextProbe = input.missionId
       ? await loadMissionDirectionContextProbe(getRequestPool(), {
           organizationId, missionId: input.missionId, runId,

@@ -57,20 +57,29 @@ function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
 export async function auditMcpToolCall(input: AuditMcpToolCallInput): Promise<void> {
   const { ctx, toolName, args, durationMs, success, errorMessage, resultSummary, desfecho, motivo } =
     input;
+  const isSemantic = toolName.startsWith("ontology_");
 
   const metadata: Record<string, unknown> = {
     actor_type: ctx.actor.type,
     actor_id: ctx.actor.id,
     tool_name: toolName,
-    args: redactArgs(args),
+    args: isSemantic
+      ? { question: "[redacted]", has_assumption: args.assumption !== undefined }
+      : redactArgs(args),
     duration_ms: durationMs,
     success,
   };
 
-  if (resultSummary) metadata.result_summary = resultSummary.slice(0, 280);
-  if (errorMessage) metadata.error = errorMessage.slice(0, 500);
   if (desfecho) metadata.desfecho = desfecho;
-  if (motivo) metadata.motivo = motivo.slice(0, 200);
+  if (isSemantic) {
+    // A request or database error can include the query or returned row.
+    if (errorMessage) metadata.error = "ontology_tool_failure";
+    if (motivo === "semantica_indisponivel_ou_nao_certificada") metadata.motivo = motivo;
+  } else {
+    if (resultSummary) metadata.result_summary = resultSummary.slice(0, 280);
+    if (errorMessage) metadata.error = errorMessage.slice(0, 500);
+    if (motivo) metadata.motivo = motivo.slice(0, 200);
+  }
   if (ctx.actor.type === "ai_agent" && ctx.actor.api_token_id) {
     metadata.actor_api_token_id = ctx.actor.api_token_id;
   }

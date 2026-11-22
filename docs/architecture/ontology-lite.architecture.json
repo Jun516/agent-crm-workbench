@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "titulo": "Ontology Lite — contrato e leitura P0",
+  "descricao": "Catálogo versionado, leitura com escopo, ferramentas MCP/Pi e evidência persistida na bancada.",
+  "lanes": [
+    {
+      "id": "fontes",
+      "label": "Fontes auditadas"
+    },
+    {
+      "id": "contrato",
+      "label": "Contrato e snapshots"
+    },
+    {
+      "id": "leitura",
+      "label": "Planejamento e leitura"
+    },
+    {
+      "id": "futuro",
+      "label": "Runtime e bancada"
+    }
+  ],
+  "mainPath": ["auditoria", "catalogo", "snapshot", "planner"],
+  "nodes": [
+    {
+      "id": "auditoria",
+      "lane": "fontes",
+      "label": "Auditoria #31",
+      "type": "doc"
+    },
+    {
+      "id": "catalogo",
+      "lane": "contrato",
+      "label": "Catálogo e validação",
+      "type": "lib"
+    },
+    {
+      "id": "snapshot",
+      "lane": "contrato",
+      "label": "Snapshots, diff e chaves",
+      "type": "lib"
+    },
+    {
+      "id": "planner",
+      "lane": "leitura",
+      "label": "Planner e leitura #33",
+      "type": "service"
+    },
+    {
+      "id": "facade",
+      "lane": "futuro",
+      "label": "Ferramentas Pi/MCP #34",
+      "type": "service"
+    },
+    {
+      "id": "workbench",
+      "lane": "futuro",
+      "label": "Bancada e recibos do Run",
+      "type": "service"
+    }
+  ],
+  "edges": [
+    {
+      "id": "audit_catalog",
+      "from": "auditoria",
+      "to": "catalogo",
+      "label": "evidência"
+    },
+    {
+      "id": "catalog_snapshot",
+      "from": "catalogo",
+      "to": "snapshot",
+      "label": "validação e versão"
+    },
+    {
+      "id": "snapshot_planner",
+      "from": "snapshot",
+      "to": "planner",
+      "label": "versão, conceitos e critérios"
+    },
+    {
+      "id": "planner_facade",
+      "from": "planner",
+      "to": "facade",
+      "label": "plano, linhas e recibo"
+    },
+    {
+      "id": "facade_workbench",
+      "from": "facade",
+      "to": "workbench",
+      "label": "observação e SSE"
+    }
+  ]
+}

@@ -28,7 +28,9 @@ export type JobKind =
   | "workbench_start"
   | "workbench_resume"
   | "internal_im_event"
-  | "internal_im_question";
+  | "internal_im_question"
+  | "customer_memory_extract"
+  | "customer_memory_consolidate";
 export type JobStatus = "pending" | "running" | "done" | "failed" | "dead";
 
 export interface JobRow {

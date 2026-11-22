@@ -1,11 +1,25 @@
 import { createHash } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
+import type { Queryable } from "@/lib/agent-engine/queue/queue";
 import { z } from "zod";
 import type { EventHandler } from "@/lib/event-log/dispatcher";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { enabledIntegration, integrationBinding, type IntegrationBinding } from "./config";
 import { integrationFetch } from "./http";
 import { integrationQuery } from "./db";
+
+import {
+  LOCKED_MEMORY_LIMIT,
+  MEMORY_READ_LIMIT,
+  memoryTaskTerms,
+  memoryPolicyFields,
+  resolveMemoryPolicy,
+  pickMemoryPolicy,
+  selectCustomerMemories,
+  projectCustomerMemory,
+  memoryIsValid,
+  type SelectableMemory,
+} from "@/lib/ai/customer-memory/policy";
 
 export const customerMemoryInput = z
   .object({
@@ -14,12 +28,23 @@ export const customerMemoryInput = z
     category: z.enum(["preference", "confirmed_fact", "communication_context"]),
     body: z.string().trim().min(1).max(2000),
     confirmed: z.literal(true),
+    ...memoryPolicyFields,
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    try {
+      resolveMemoryPolicy(pickMemoryPolicy(input));
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "memory_policy_invalid",
+      });
+    }
+  });
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const userScope = (org: string, contact: string) => digest(`crm-customer:v1:${org}:${contact}`);
 const memoryScope = (org: string, memory: string) => digest(`crm-memory:v1:${org}:${memory}`);
-interface MemoryRow {
+interface MemoryRow extends SelectableMemory {
   id: string;
   organization_id: string;
   contact_id: string | null;
@@ -29,6 +54,7 @@ interface MemoryRow {
   content_hash: string;
   sync_state: string;
   external_id: string | null;
+  policy_hash?: string | null;
   write_outcome: "never_started" | "in_flight" | "confirmed" | "unknown";
   deleted_at: string | null;
   remote_deleted_at: string | null;
@@ -62,22 +88,27 @@ export async function saveCustomerMemory(
   org: string,
   actor: string,
   input: z.infer<typeof customerMemoryInput>,
+  transaction?: PoolClient,
 ) {
   const parsed = customerMemoryInput.parse(input);
+  const policy = resolveMemoryPolicy(pickMemoryPolicy(parsed));
+  const policyHash = digest(JSON.stringify(policy));
   const hash = digest(
     JSON.stringify({ contact: parsed.contact_id, category: parsed.category, body: parsed.body }),
   );
-  const client = await pool.connect();
+  const client = transaction ?? (await pool.connect());
   try {
-    await client.query("begin");
+    if (!transaction) await client.query("begin");
     const contact = await client.query(
       "select id from contacts where organization_id=$1 and id=$2 and is_anonymized=false and is_merged_into is null for update",
       [org, parsed.contact_id],
     );
     if (!contact.rows[0]) throw new Error("customer_memory_contact_unavailable");
     const created = await client.query<MemoryRow>(
-      `insert into ai_customer_memories(organization_id,contact_id,request_key,category,body,content_hash,confirmed_by,subject_key)
-       values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(organization_id,request_key) do nothing returning *`,
+      `insert into ai_customer_memories(organization_id,contact_id,request_key,category,body,content_hash,confirmed_by,subject_key,
+         memory_type,attribute_key,attribute_value,risk_level,retention_policy,ttl_expires_at,review_due_at,locked,supersedes,policy_hash)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       on conflict(organization_id,request_key) do nothing returning *`,
       [
         org,
         parsed.contact_id,
@@ -87,6 +118,16 @@ export async function saveCustomerMemory(
         hash,
         actor,
         userScope(org, parsed.contact_id),
+        policy.memory_type,
+        policy.attribute_key,
+        policy.attribute_value,
+        policy.risk_level,
+        policy.retention_policy,
+        policy.ttl_expires_at,
+        policy.review_due_at,
+        policy.locked,
+        policy.supersedes,
+        policyHash,
       ],
     );
     const row =
@@ -97,30 +138,78 @@ export async function saveCustomerMemory(
           [org, parsed.request_key],
         )
       ).rows[0];
-    if (!row || row.content_hash !== hash || row.deleted_at)
+    const storedPolicyHash =
+      row?.policy_hash ??
+      (row
+        ? digest(
+            JSON.stringify({
+              ...policy,
+              memory_type: row.memory_type ?? "relationship_context",
+              attribute_key: row.attribute_key ?? null,
+              attribute_value: row.attribute_value ?? null,
+              risk_level: row.risk_level ?? "high",
+              retention_policy: row.retention_policy ?? "durable",
+              ttl_expires_at: row.ttl_expires_at ?? null,
+              review_due_at: row.review_due_at ?? null,
+              locked: row.locked ?? false,
+              supersedes: row.supersedes ?? null,
+            }),
+          )
+        : null);
+    if (!row || row.content_hash !== hash || row.deleted_at || storedPolicyHash !== policyHash)
       throw new Error("customer_memory_idempotency_conflict");
-    if (created.rows.length)
+    if (created.rows.length) {
+      if (policy.supersedes) {
+        const prior = await client.query<MemoryRow>(
+          "select * from ai_customer_memories where organization_id=$1 and contact_id=$2 and id=$3 and deleted_at is null for update",
+          [org, parsed.contact_id, policy.supersedes],
+        );
+        if (!prior.rows[0]) throw new Error("customer_memory_replacement_unavailable");
+        if (prior.rows[0].locked) throw new Error("customer_memory_unlock_required");
+        await client.query(
+          `with retired as (
+            update ai_customer_memories set body='',attribute_key=null,attribute_value=null,
+              remote_deleted_at=case when write_outcome='never_started' then now() else remote_deleted_at end,
+              sync_state='deleted',deleted_at=now(),updated_at=now(),policy_revision=policy_revision+1
+            where organization_id=$1 and contact_id=$2 and id=$3 returning id
+          ) insert into event_log(organization_id,event_type,entity_kind,entity_id,payload)
+            select $1,'ai_integration.mem0_sync','ai_customer_memory',id,jsonb_build_object('memory_id',id) from retired`,
+          [org, parsed.contact_id, policy.supersedes],
+        );
+      }
+      if (policy.attribute_key) {
+        const opposite = await client.query(
+          `select id from ai_customer_memories where organization_id=$1 and contact_id=$2 and id<>$3
+           and deleted_at is null and attribute_key=$4 and attribute_value<>$5
+           and (ttl_expires_at is null or ttl_expires_at>now()) limit 1`,
+          [org, parsed.contact_id, row.id, policy.attribute_key, policy.attribute_value],
+        );
+        if (opposite.rows.length) throw new Error("customer_memory_conflict_requires_arbitration");
+      }
       await client.query(
         `insert into event_log(organization_id,event_type,entity_kind,entity_id,payload)
        values($1,'ai_integration.mem0_sync','ai_customer_memory',$2,$3::jsonb)`,
         [org, row.id, JSON.stringify({ memory_id: row.id })],
       );
-    await client.query("commit");
+    }
+    if (!transaction) await client.query("commit");
     return { id: row.id, sync_state: row.sync_state, confirmed: true };
   } catch (error) {
-    await client.query("rollback");
+    if (!transaction) await client.query("rollback");
     throw error;
   } finally {
-    client.release();
+    if (!transaction) client.release();
   }
 }
 
-export async function deleteCustomerMemory(pool: Pool, org: string, id: string) {
+export async function deleteCustomerMemory(pool: Queryable, org: string, id: string) {
   // Tombstone and deletion request are one SQL statement: retrieval is blocked immediately.
   const { rows } = await pool.query(
     `with retired as (
-      update ai_customer_memories set body='',remote_deleted_at=case when write_outcome='never_started' then now() else remote_deleted_at end,sync_state='deleted',deleted_at=coalesce(deleted_at,now()),updated_at=now()
-      where organization_id=$1 and id=$2 returning id
+      update ai_customer_memories set body='',attribute_key=null,attribute_value=null,review_reason=null,evidence_conversation_id=null,
+        policy_revision=policy_revision+1,remote_deleted_at=case when write_outcome='never_started' then now() else remote_deleted_at end,
+        sync_state='deleted',deleted_at=coalesce(deleted_at,now()),updated_at=now()
+      where organization_id=$1 and id=$2 and locked=false returning id
     ) insert into event_log(organization_id,event_type,entity_kind,entity_id,payload)
       select $1,'ai_integration.mem0_sync','ai_customer_memory',id,jsonb_build_object('memory_id',id) from retired returning entity_id`,
     [org, id],
@@ -321,11 +410,65 @@ export async function readConfirmedCustomerMemory(
   const binding = integrationBinding(org, "mem0")
     ? await enabledIntegration(pool, org, "mem0").catch(() => null)
     : null;
-  const local = await integrationQuery<MemoryRow>(
-    pool,
-    "select * from ai_customer_memories where organization_id=$1 and contact_id=$2 and deleted_at is null order by created_at desc limit 50",
-    [org, contact],
-  );
+  const readLocal = async () => {
+    const rows = await integrationQuery<MemoryRow>(
+      pool,
+      `select * from ai_customer_memories where organization_id=$1 and contact_id=$2 and deleted_at is null
+       and (ttl_expires_at is null or ttl_expires_at>now())
+       order by case when needs_review or review_due_at<=now() then 1 else 0 end,
+         (select count(*) from unnest($3::text[]) as search(term)
+          where strpos(lower(concat_ws(' ',memory_type,attribute_key,body)),search.term)>0) desc,
+         created_at desc,id desc limit ${MEMORY_READ_LIMIT + 1}`,
+      [org, contact, memoryTaskTerms(query)],
+    );
+    const locked = await integrationQuery<MemoryRow>(
+      pool,
+      `select * from ai_customer_memories where organization_id=$1 and contact_id=$2 and deleted_at is null and locked=true
+       and (ttl_expires_at is null or ttl_expires_at>now())
+       order by created_at desc limit ${LOCKED_MEMORY_LIMIT + 1}`,
+      [org, contact],
+    );
+    return {
+      rows: [...rows.rows.slice(0, MEMORY_READ_LIMIT), ...locked.rows],
+      bounded: rows.rows.length > MEMORY_READ_LIMIT,
+    };
+  };
+  const local = await readLocal();
+  let hits: z.infer<typeof remoteSchema>[] = [];
+  const readSemanticRows = async () => {
+    if (!hits.length) return [];
+    // Match remote identities to owned SQL rows rather than to the lexical top-K.
+    // No remote prose enters this query or the resulting customer context.
+    const result = await integrationQuery<MemoryRow>(
+      pool,
+      `select * from ai_customer_memories m where m.organization_id=$1 and m.contact_id=$2
+       and m.deleted_at is null and (m.ttl_expires_at is null or m.ttl_expires_at>now())
+       and exists(select 1 from jsonb_to_recordset($3::jsonb) as hit(id text,crm_id text,crm_hash text)
+         where hit.id=m.external_id and hit.crm_hash=m.content_hash
+           and hit.crm_id=encode(extensions.digest('crm-memory:v1:'||m.organization_id::text||':'||m.id::text,'sha256'),'hex'))
+       order by m.id limit 100`,
+      [
+        org,
+        contact,
+        JSON.stringify(
+          hits.map((h) => ({ id: h.id, crm_id: h.metadata.crm_id, crm_hash: h.metadata.crm_hash })),
+        ),
+      ],
+    );
+    return result.rows.filter(
+      (row) =>
+        row.organization_id === org &&
+        row.contact_id === contact &&
+        memoryIsValid(row) &&
+        hits.some(
+          (h) =>
+            h.id === row.external_id &&
+            h.metadata.crm_id === memoryScope(org, row.id) &&
+            h.metadata.crm_hash === row.content_hash,
+        ),
+    );
+  };
+  let observedSemantic: MemoryRow[] = [];
   let ids: string[] = [];
   let status = binding ? "local_fallback" : "local";
   let providerStatus = binding ? "unavailable" : "disabled";
@@ -341,59 +484,60 @@ export async function readConfirmedCustomerMemory(
         }),
       });
       const results = z.object({ results: z.array(z.unknown()).max(100) }).parse(payload).results;
-      // Remote content is never trusted: rank only known owned IDs, then use current local facts.
-      ids = results
+      hits = results
         .map((value) => remoteSchema.parse(value))
-        .filter((value) => value.user_id === userScope(org, contact))
-        .flatMap((value) =>
-          local.rows
-            .filter(
-              (row) =>
-                row.external_id === value.id &&
-                value.metadata.crm_id === memoryScope(org, row.id) &&
-                value.metadata.crm_hash === row.content_hash,
-            )
-            .map((row) => row.id),
-        );
+        .filter((value) => value.user_id === userScope(org, contact));
+      observedSemantic = await readSemanticRows();
+      ids = hits.flatMap((h) =>
+        observedSemantic
+          .filter(
+            (row) =>
+              row.external_id === h.id &&
+              h.metadata.crm_id === memoryScope(org, row.id) &&
+              h.metadata.crm_hash === row.content_hash,
+          )
+          .map((row) => row.id),
+      );
       status = "mem0";
       providerStatus = "connected";
     } catch {
       signal?.throwIfAborted();
+      hits = [];
+      observedSemantic = [];
+      ids = [];
     }
   await assertContact(pool, org, contact);
-  const fresh = await integrationQuery<MemoryRow>(
-    pool,
-    "select * from ai_customer_memories where organization_id=$1 and contact_id=$2 and deleted_at is null order by created_at desc limit 50",
-    [org, contact],
+  const fresh = await readLocal();
+  const currentSemantic = await readSemanticRows();
+  // Search authority is rechecked against the current SQL hash as well as current privacy/TTL.
+  ids = ids.filter((id) =>
+    currentSemantic.some(
+      (row) =>
+        row.id === id &&
+        observedSemantic.some((old) => old.id === id && old.content_hash === row.content_hash) &&
+        (!local.rows.some((old) => old.id === id) ||
+          local.rows.some((old) => old.id === id && old.content_hash === row.content_hash)),
+    ),
   );
-  // The local re-read also awaits I/O. Discard it if privacy eligibility was
-  // withdrawn while it was pending; a pre-query check cannot guard that window.
+  // The local and semantic re-reads both await I/O. Check privacy after both.
   await assertContact(pool, org, contact);
-  const ordered = ids.length
-    ? [...fresh.rows].sort((a, b) => {
-        const rank = (id: string) => (ids.includes(id) ? ids.indexOf(id) : 999);
-        return rank(a.id) - rank(b.id);
-      })
-    : fresh.rows;
+  const ranked = new Set(ids);
+  const { selected, truncated } = selectCustomerMemories(
+    [...fresh.rows, ...currentSemantic.filter((row) => ranked.has(row.id))],
+    ids,
+    query,
+  );
   return {
     status,
     source: "crm_confirmed_facts",
     schemaVersion: 1,
     providerStatus,
-    coverage: ordered.length > 10 ? "partial" : "complete",
-    returnedCount: Math.min(ordered.length, 10),
-    // Bounded selection, not a claim that all CRM facts were read.
-    readLimit: 50,
-    memories: ordered.slice(0, 10).map((row) => ({
-      id: row.id,
-      category: row.category,
-      body: row.body,
-      revision: row.content_hash,
-      confirmed: true,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      authority: "customer_context_only",
-    })),
+    coverage: fresh.bounded || truncated ? "partial" : "complete",
+    returnedCount: selected.length,
+    readLimit: MEMORY_READ_LIMIT,
+    lockedReadLimit: LOCKED_MEMORY_LIMIT,
+    absence_semantics: "not_recalled_does_not_mean_no_preference",
+    memories: selected.map((row) => projectCustomerMemory(row)),
   };
 }
 

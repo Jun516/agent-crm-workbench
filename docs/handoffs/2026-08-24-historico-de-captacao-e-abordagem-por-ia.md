@@ -1,5 +1,7 @@
 # Histórico de leads captados + abordagem escrita pela IA + a automação para de mentir
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 Entrega de 2026-08-24. Três coisas, e a terceira nasceu de um relato de uso
 real: uma automação ligada, um lead entrando pelo formulário, e nenhuma
 mensagem chegando ao cliente.
@@ -52,11 +54,11 @@ start`), com o app dirigido por Playwright:
 
 | Imagem | O que prova |
 |---|---|
-| `evidence/webhooks-historico-e-ia/01-leads-recebidos.png` | A aba nova com a tabela: quem, contato, fonte, quando, origem, resultado — e uma linha **"Não entrou"** ao lado das que viraram lead |
-| `evidence/webhooks-historico-e-ia/02-detalhe-da-captacao.png` | O painel: campos do formulário, data e hora por extenso, página de origem, **endereço IP** e navegador, com o link para o lead |
-| `evidence/webhooks-historico-e-ia/03-atividade-diz-falhou.png` | O conserto do relato: badge **Falhou** e a frase "Não conseguimos falar com o serviço de WhatsApp. Confira se ele está no ar." — onde antes havia ✓ Sucesso |
-| `evidence/webhooks-historico-e-ia/04-acao-mensagem-pela-ia.png` | A ação nova no ENTÃO: agente publicado, número, e o campo "O que a IA deve fazer com os dados" preenchido |
-| `evidence/webhooks-historico-e-ia/05-mobile-390.png` | 390px: filtros empilhados e a tabela rolando DENTRO do próprio container — o corpo da página não rola na horizontal (medido: `scrollWidth` 390 = `clientWidth` 390) |
+| evidence/webhooks-historico-e-ia/01-leads-recebidos.png | A aba nova com a tabela: quem, contato, fonte, quando, origem, resultado — e uma linha **"Não entrou"** ao lado das que viraram lead |
+| evidence/webhooks-historico-e-ia/02-detalhe-da-captacao.png | O painel: campos do formulário, data e hora por extenso, página de origem, **endereço IP** e navegador, com o link para o lead |
+| evidence/webhooks-historico-e-ia/03-atividade-diz-falhou.png | O conserto do relato: badge **Falhou** e a frase "Não conseguimos falar com o serviço de WhatsApp. Confira se ele está no ar." — onde antes havia ✓ Sucesso |
+| evidence/webhooks-historico-e-ia/04-acao-mensagem-pela-ia.png | A ação nova no ENTÃO: agente publicado, número, e o campo "O que a IA deve fazer com os dados" preenchido |
+| evidence/webhooks-historico-e-ia/05-mobile-390.png | 390px: filtros empilhados e a tabela rolando DENTRO do próprio container — o corpo da página não rola na horizontal (medido: `scrollWidth` 390 = `clientWidth` 390) |
 
 Medidas por ferramenta, não a olho (`getBoundingClientRect` via Playwright): a
 `TabsList` com quatro abas mede **431,94px** em 1440px de viewport — o skeleton

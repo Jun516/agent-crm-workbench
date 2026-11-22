@@ -1,6 +1,17 @@
+import { loadMissionBudgetUsage } from "@/lib/ai/agents/mission-budget";
+import { parseMissionAcceptanceContract } from "@/lib/ai/evals/mission-acceptance-contract";
+import { claimJobs, reapExpiredJobs } from "@/lib/agent-engine/queue/queue";
+import { createServer } from "node:http";
+import { createApprovedReplyHandler } from "@/lib/agent-engine/agent/approved-reply";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { meetPgSupabase } from "../support/meet-pg-supabase";
+import { loadMissionDeliveryEvidence } from "@/lib/ai/evals/mission-delivery-evidence";
+import { loadMissionCustomerResponses } from "@/lib/ai/evals/mission-customer-response";
+import { evaluateMission } from "@/lib/ai/evals/evaluate-mission";
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { assertWorkbenchJobLease } from "@/lib/ai/agents/workbench-job-lease";
 import {
   finalizeWorkbenchSendDecision, reconcileWorkbenchSendDecisions,
@@ -1046,4 +1057,98 @@ describe("Mission cancellation fences customer delivery", () => {
     );
     expect(rows[0]).toEqual({ auth: false, service: true });
   });
+  it.each([
+    ["quote", "Customer confirms the quote"],
+    ["appointment", "Customer confirms the appointment"],
+  ])("%s: accepted delivery is not confirmation and retry does not send twice", async (_scenario, criteria) => {
+    const f = await stagedMission();
+    let posts = 0;
+    const receiver = createServer(async (req, res) => {
+      if (req.method === "GET") { res.end(JSON.stringify({ numberExists: true, chatId: "5531998765432@c.us" })); return; }
+      for await (const _chunk of req) { /* drain */ }
+      posts++;
+      res.end(JSON.stringify({ id: `mission-receipt-${f.runId}` }));
+    });
+    await new Promise<void>((resolve) => receiver.listen(0, "127.0.0.1", resolve));
+    const address = receiver.address();
+    if (!address || typeof address === "string") throw new Error("receiver_missing");
+    const oldUrl = process.env.WAHA_API_BASE_URL, oldKey = process.env.WAHA_API_KEY;
+    process.env.WAHA_API_BASE_URL = `http://127.0.0.1:${address.port}`;
+    process.env.WAHA_API_KEY = "synthetic-receiver";
+    try {
+      await pool.query("update contacts set phone_number='+5531998765432',force_human=true where organization_id=$1 and id=$2", [org, contact]);
+      const channel = (await pool.query<{channel_session_id: string}>("select channel_session_id from conversations where organization_id=$1 and id=$2", [org, conversation])).rows[0]!.channel_session_id;
+      await pool.query("insert into channel_knobs(organization_id,channel_session_id,throttle_ms,jitter_max_ms,window_start_hour,window_end_hour) values($1,$2,0,0,0,24) on conflict (organization_id,channel_session_id) do update set throttle_ms=0,jitter_max_ms=0,window_start_hour=0,window_end_hour=24", [org, channel]);
+      await pool.query("update ai_missions set acceptance_contract=$3::jsonb,acceptance_criteria=$4 where organization_id=$1 and id=$2", [org, f.missionId, JSON.stringify({ revision: 1, checks: [{ kind: "customer_inbound_after_verified_send" }] }), criteria]);
+      const userDb = await pool.connect();
+      let jobId: string;
+      try {
+        await userDb.query("begin"); await userDb.query("set local role authenticated");
+        await userDb.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: actor, role: "authenticated", aal: "aal1" })]);
+        jobId = (await userDb.query<{job_id: string}>("select public.fn_reply_action($1,$2,'1','approve',$3,null) as job_id", [org, f.draftId, "Approved quote"])).rows[0]!.job_id;
+        await userDb.query("commit");
+      } catch (error) { await userDb.query("rollback"); throw error; } finally { userDb.release(); }
+      expect(await finalizeWorkbenchSendDecision(pool, { organizationId: org, runId: f.runId, proposalId: f.proposalId })).toMatchObject({ decision: "approve" });
+      // Other cases share the contact; release their synthetic leases before this acquisition.
+      await pool.query("update job_queue set status='failed',locked_by=null,locked_at=null where organization_id=$1 and contact_id=$2 and id<>$3 and status in ('running','pending')", [org, contact, jobId]);
+      const job = (await pool.query("update job_queue set status='running',locked_by='mission-reply-test',locked_at=clock_timestamp(),attempts=1 where organization_id=$1 and id=$2 returning *,locked_at::text claim_acquired_at", [org, jobId])).rows[0];
+      const db = meetPgSupabase(pool);
+      vi.mocked(createAdminClient).mockReturnValue(db.client as never);
+      const worker = createApprovedReplyHandler({ crmCfg: { supabase: db.client },
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }, sleep: async () => {} });
+      const crashingPool = new Proxy(pool, { get(target, key) {
+        if (key === "query") return (sql: string, args: unknown[]) => {
+          if (sql.includes("fn_reply_settle") && args[4] === "sent") throw new Error("synthetic_settle_failure");
+          return target.query(sql, args);
+        };
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      } });
+      await expect(worker(job, crashingPool)).rejects.toThrow("synthetic_settle_failure");
+      expect(posts, JSON.stringify(db.errors)).toBe(1);
+      // Expire and reacquire the actual lease; recovery reconciles the accepted ledger.
+      await pool.query("update job_queue set locked_at=now()-interval '20 minutes' where organization_id=$1 and id=$2", [org, jobId]);
+      await reapExpiredJobs(pool, { visibilityTimeoutMs: 1 });
+      const reacquired = (await claimJobs(pool, { workerId: "mission-retry", maxConcurrency: 20, batchSize: 20 }))
+        .find((candidate) => candidate.id === jobId);
+      expect(reacquired).toBeDefined();
+      await worker(reacquired!, pool);
+      expect(posts).toBe(1);
+      expect((await pool.query("select status from ai_reply_drafts where organization_id=$1 and id=$2", [org, f.draftId])).rows[0].status).toBe("sent");
+      const [delivery] = await loadMissionDeliveryEvidence(pool, org, [f.proposalId]);
+      expect(delivery).toMatchObject({ status: "sent", ledger: { status: "accepted" }, message: { status: "sent" } });
+      const replies = await loadMissionCustomerResponses(pool, org, [delivery!.messageId!]);
+      expect(replies).toMatchObject([{ reply: null }]);
+      const events = (await pool.query<{run_id: string; sequence: number; event_type: string; payload: Record<string, unknown>}>(
+        "select run_id,sequence,event_type,payload from ai_agent_run_events where organization_id=$1 and run_id=$2 order by sequence", [org, f.runId])).rows;
+      const mission = (await pool.query<{status: string; acceptance_contract: unknown; acceptance_criteria: string; max_runs: number}>("select status,acceptance_contract,acceptance_criteria,max_runs from ai_missions where organization_id=$1 and id=$2", [org, f.missionId])).rows[0]!;
+      const budget = await loadMissionBudgetUsage(pool, org, f.missionId);
+      expect(budget).not.toBeNull();
+      const run = (await pool.query<{status: string; error_code: string | null}>("select status,error_code from ai_workbench_runs where organization_id=$1 and id=$2", [org, f.runId])).rows[0]!;
+      const currentLead = (await pool.query<{status: string; stage_id: string; contact_id: string | null}>("select status,stage_id,contact_id from crm_leads where organization_id=$1 and id=$2", [org, lead])).rows[0]!;
+      const report = evaluateMission({
+        mission: { id: f.missionId, leadId: lead, status: mission.status, acceptanceCriteria: mission.acceptance_criteria,
+          acceptanceContract: parseMissionAcceptanceContract(mission.acceptance_contract),
+          resolutionReason: null, resolvedByUserId: null, maxRuns: mission.max_runs, deadlineAt: null },
+        runs: [{ id: f.runId, status: run.status, errorCode: run.error_code }], specialists: [],
+        proposals: [{ id: f.proposalId, runId: f.runId, toolName: "send_message", status: "executed" }],
+        replyDrafts: [delivery!], customerResponses: replies,
+        events: events.map((event) => ({ runId: event.run_id, sequence: event.sequence, eventType: event.event_type, payload: event.payload })),
+        lead: { id: lead, status: currentLead.status, stageId: currentLead.stage_id, contactId: currentLead.contact_id },
+        budget: budget!,
+        structuredOffer: { offerId: null, verdict: "not_issued", reason: "explicit_offer_missing", terms: null,
+          outboundMessageId: null, inboundMessageId: null, structuredTermsAccepted: false },
+      });
+      expect(report).toMatchObject({ verdict: "in_progress", businessOutcomeVerified: false, observableConditionsMet: false,
+        observableChecks: [{ kind: "customer_inbound_after_verified_send", verdict: "unmet" }],
+        summary: { customerMessagesSent: 1, customerRepliesObserved: 0 } });
+
+    } finally {
+      if (oldUrl === undefined) delete process.env.WAHA_API_BASE_URL; else process.env.WAHA_API_BASE_URL = oldUrl;
+      if (oldKey === undefined) delete process.env.WAHA_API_KEY; else process.env.WAHA_API_KEY = oldKey;
+      receiver.closeAllConnections(); await new Promise<void>((resolve) => receiver.close(() => resolve()));
+      await cancel(f.missionId);
+    }
+  });
+
 });

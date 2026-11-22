@@ -1,5 +1,7 @@
 # HANDOFF — CRM Vivo
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > Histórico append-only da entrega. **Nunca reescrever, só acrescentar.**
 > O que não está aqui, não aconteceu.
 >
@@ -99,11 +101,11 @@ do repositório.
 |---|---|---|---|
 | — | Seed roda limpo em banco com dados | ✅ 10 leads criados em 6 estágios | log: `pipeline criado 35bf4ac9-…` + 10× `lead criado` |
 | — | **Idempotência** — 2ª execução não duplica | ✅ 10× `lead atualizado`, **mesmos ids** | log da 2ª execução |
-| 0.1 | Board renderiza na tela após login real | ✅ **aprovado por mim** — login real, 10 leads nas 4 colunas, valores somados por estágio | `evidence/wave-0-board-antes.png` |
-| 0.2 | Close do card padrão | ❌ reprovado → ✅ **refeito e aprovado** — agora é o container do card (borda, título, valor, chip de tag, dono) | `evidence/wave-0-card-antes.png` |
-| 0.3 | Navegação alcançável por clique | ✅ **aprovado** — `/login` → MFA TOTP do admin dígito a dígito → `/app/inbox` → clica *Kanban* → clica *CRM Vivo — Clínica*. Zero URL direta | `evidence/wave-0-navegacao.png` |
+| 0.1 | Board renderiza na tela após login real | ✅ **aprovado por mim** — login real, 10 leads nas 4 colunas, valores somados por estágio | evidence/wave-0-board-antes.png |
+| 0.2 | Close do card padrão | ❌ reprovado → ✅ **refeito e aprovado** — agora é o container do card (borda, título, valor, chip de tag, dono) | evidence/wave-0-card-antes.png |
+| 0.3 | Navegação alcançável por clique | ✅ **aprovado** — `/login` → MFA TOTP do admin dígito a dígito → `/app/inbox` → clica *Kanban* → clica *CRM Vivo — Clínica*. Zero URL direta | evidence/wave-0-navegacao.png |
 | 0.4 | Matriz do seed conferida no banco (3 execuções) | ✅ **aprovado** — 10/10 requisitos PASS | `evidence/wave-0.md` §"Matriz do seed" |
-| 0.5 | Card de título longo (estrago atual) | ⏳ pendente | `evidence/wave-0-card-titulo-longo-antes.png` |
+| 0.5 | Card de título longo (estrago atual) | ⏳ pendente | evidence/wave-0-card-titulo-longo-antes.png |
 | 0.6 | Linha de base dos e2e existentes | ⏳ pendente | `kanban-owner-filter`, `rbac-roles`, `risk-radar` |
 
 #### Medida da linha de base — **por ferramenta, não a olho**
@@ -143,7 +145,7 @@ O diagnóstico do briefing aparece na tela, sem precisar de instrumentação:
 | Dev server morria com `EADDRINUSE :3020` | Primeira instância havia sobrevivido a uma interrupção e já ocupava a porta; o `curl` inicial deu `000` porque o Next ainda compilava, o que me fez concluir errado que estava morto | Reusar a instância viva em vez de subir outra | ✅ `curl /login` → 200 |
 | Hook `lina guard --pretooluse` interrompia a execução pedindo yes/no | Gate do modo de autonomia *assistido*, em `pi-native-crm/.claude/settings.json` | Removido o hook do bloco `hooks.PreToolUse` (o hook HTTP assíncrono de telemetria permanece) | ✅ sem prompts desde então |
 | Migration 0070 escrita mas **não aplicada**; `psql` recusa com `must be owner of table crm_leads` | `SUPABASE_DB_URL` conecta como role `agent_worker`; o dono de `crm_leads` é `postgres`, e `agent_worker` não é membro de nenhum role | Escalado ao responsável pelo produto (regra: terminal não fala com o humano, eu falo). Aguardando `SUPABASE_DB_URL_ADMIN` no `.env.local` | ⏳ |
-| `evidence/wave-0-card-antes.png` "existe" e não prova nada — contém só o texto do título | `capture-wave-0.ts:137` — `card.screenshot().catch(fallback)` onde o fallback screenshota o próprio `getByText`. O locator do card falhou, o `catch` engoliu e produziu artefato inferior | **Regra nova para todo o time:** em script de evidência, `catch` nunca degrada para artefato pior — ou captura o alvo, ou falha alto dizendo qual locator não resolveu. Correção: subir do heading para o ancestral arrastável e validar o retângulo (falhar se `width<200` ou `height<80`) | ✅ `wave-0-card-antes.png` = **302×143px**, `wave-0-card-titulo-longo-antes.png` = **302×154px**, ambos o card inteiro (borda, valor, tag, dono). Sem `catch` degradante no script |
+| evidence/wave-0-card-antes.png "existe" e não prova nada — contém só o texto do título | `capture-wave-0.ts:137` — `card.screenshot().catch(fallback)` onde o fallback screenshota o próprio `getByText`. O locator do card falhou, o `catch` engoliu e produziu artefato inferior | **Regra nova para todo o time:** em script de evidência, `catch` nunca degrada para artefato pior — ou captura o alvo, ou falha alto dizendo qual locator não resolveu. Correção: subir do heading para o ancestral arrastável e validar o retângulo (falhar se `width<200` ou `height<80`) | ✅ wave-0-card-antes.png = **302×143px**, wave-0-card-titulo-longo-antes.png = **302×154px**, ambos o card inteiro (borda, valor, tag, dono). Sem `catch` degradante no script |
 | Selector do card proposto na revisão (`data-rbd-draggable-id`) não existe no DOM | O board usa `@hello-pangea/dnd`, cujo prefixo é **`rfd`** (`data-rfd-draggable-id`), não o `rbd` do `react-beautiful-dnd` original. Uma letra | `CARD_ATTR = "data-rfd-draggable-id"`. A falha passou a **se autodiagnosticar**: quando o ancestral não resolve, despeja a cadeia real de ancestrais com tag, atributos e retângulo de cada nível — em vez de só acusar ausência | ✅ diagnosticado e corrigido em 1 execução, sem tentativa e erro |
 | **Todo o time travava sem produzir nada** — terminais consumiam o despacho e voltavam a `Idle`/`Blocked`, cinco despachos sem um byte no disco | `lina check` revelou `Blocked (motivo: permission_prompt)`. O worktree novo `pi-native-crm-crm-vivo` **não tinha `.claude/settings.local.json`** (o arquivo é gitignored, então não veio de `origin/main`). Sem ele, todo comando de todo terminal caía num prompt de permissão que ninguém respondia. Não era o canal A2A do Lina — as mensagens chegavam e eram consumidas | Copiado `.claude/settings.local.json` do projeto (`defaultMode: bypassPermissions`) para o worktree | ✅ time voltou a produzir no despacho seguinte |
 | Navegação por clique pode não ter sido exercida | `capture-wave-0.ts:124` — se o link/picker não resolve, cai em `page.goto` direto da URL do pipeline. Viola a §7 e, pior, **esconde regressão de navegação**: o screenshot sai bonito e ninguém sabe | Fallback removido; o script agora falha se o clique não chegar ao pipeline do seed. O `picker` genérico (combobox) foi substituído pelo caminho real: menu **Kanban** → linha **"CRM Vivo — Clínica"** na lista de pipelines | ✅ log da execução mostra os 2 cliques e a URL final = pipeline do seed. O run que gerou o PNG **reprovado** (18:17) tinha de fato caído no fallback — daí o registro |
@@ -1177,7 +1179,7 @@ devolvendo `{ data: AtRiskData }`). Quem se adaptou foi o **board** (`KanbanBoar
 hook. O radar (`RiskRadarList.tsx:44`) consome exatamente como antes.
 **Provado na tela**, não por leitura de código: login como manager, clique em *Radar* no menu,
 página renderiza normal (`40 crítico / 2 em risco / 0 em voo`), zero erro de JS.
-Evidência: `evidence/wave-2-radar-sem-regressao.png`.
+Evidência: evidence/wave-2-radar-sem-regressao.png.
 
 ---
 
@@ -1343,7 +1345,7 @@ Confirmado na tela: um relógio por card (onde o slot contou o silêncio, o roda
 tags fora do card, sobrando só o ponto de 6px da tag canônica; valor nulo virou `—` (ausência
 explícita, sem `R$ 0` nem `NaN`).
 
-**Cenário 8** — antes/depois lado a lado em `evidence/wave-2-antes-depois.png`, composto sem
+**Cenário 8** — antes/depois lado a lado em evidence/wave-2-antes-depois.png, composto sem
 instalar nada (HTML + o próprio chromium do projeto como compositor).
 
 ---
@@ -1352,7 +1354,7 @@ instalar nada (HTML + o próprio chromium do projeto como compositor).
 
 **Achado do `@QAVivo`, e é o mais perigoso da série.**
 
-`evidence/wave-0-board-antes.png` é **artefato histórico irreproduzível** — o código que o gerou
+evidence/wave-0-board-antes.png é **artefato histórico irreproduzível** — o código que o gerou
 não existe mais. E `tests/capture-wave-0.ts` **sobrescreve esse arquivo a cada execução**, com o
 mesmo nome, sem checar nada. Um reflexo de dedo apaga a metade esquerda do cenário 8 **para
 sempre**.
@@ -2039,7 +2041,7 @@ caso do array vazio de `evidence`).
 
 ## Wave 3 — achado do orquestrador: a timeline fala máquina (bloco 2.5 re-mirado)
 
-**Como apareceu:** o print `wave-3-c10-timeline-contato.png` mostrava a aba Timeline do contato
+**Como apareceu:** o print wave-3-c10-timeline-contato.png mostrava a aba Timeline do contato
 **totalmente em branco** — nem lista, nem esqueleto, nem o estado vazio que o componente declara
 ("Nenhuma atividade registrada ainda"), nem erro. Um **quarto estado** que o componente não tem.
 
@@ -3061,14 +3063,14 @@ handoff descreve; faltava o handoff apontar.
 
 | prova | o que ela mostra |
 |---|---|
-| `evidence/wave-3-c11-veto-na-tela.png` | *"Envio bloqueado · Bot Padrão E2E — Não enviei: limite de ritmo de envio atingido"* |
-| `evidence/wave-3-2.8-painel-ok.png` | o painel do inbox mostrando lead e atividade, com motivo humano |
-| `evidence/wave-3-2.8-painel-falha.png` | as três seções dizendo *"Não consegui ler estes dados"* com "Tentar de novo" |
-| `evidence/sonda-pulso-durante.png` · `evidence/sonda-pulso-depois.png` | o par que provou o pulso **no pixel**, e o retorno byte a byte ao repouso |
-| `wave3-pulso/pulso-claro-2-durante.png` · `wave3-pulso/pulso-claro-3-cessou.png` | o pulso no tema claro: aparece e cessa |
-| `wave3-pulso/pulso-escuro-1-antes.png` · `wave3-pulso/pulso-escuro-2-durante.png` | o mesmo no tema escuro |
-| `wave3-pulso/pulso-reduce-1-antes.png` · `wave3-pulso/pulso-reduce-2-durante.png` | movimento reduzido: sem animação, estado ainda legível |
-| `wave3-pulso/pulso-claro-1-antes.png` | o repouso, referência das comparações acima |
+| evidence/wave-3-c11-veto-na-tela.png | *"Envio bloqueado · Bot Padrão E2E — Não enviei: limite de ritmo de envio atingido"* |
+| evidence/wave-3-2.8-painel-ok.png | o painel do inbox mostrando lead e atividade, com motivo humano |
+| evidence/wave-3-2.8-painel-falha.png | as três seções dizendo *"Não consegui ler estes dados"* com "Tentar de novo" |
+| evidence/sonda-pulso-durante.png · evidence/sonda-pulso-depois.png | o par que provou o pulso **no pixel**, e o retorno byte a byte ao repouso |
+| wave3-pulso/pulso-claro-2-durante.png · wave3-pulso/pulso-claro-3-cessou.png | o pulso no tema claro: aparece e cessa |
+| wave3-pulso/pulso-escuro-1-antes.png · wave3-pulso/pulso-escuro-2-durante.png | o mesmo no tema escuro |
+| wave3-pulso/pulso-reduce-1-antes.png · wave3-pulso/pulso-reduce-2-durante.png | movimento reduzido: sem animação, estado ainda legível |
+| wave3-pulso/pulso-claro-1-antes.png | o repouso, referência das comparações acima |
 
 **Achado 8, e a subpasta nasceu nesta wave:** `evidence/wave3-pulso/` só podia ser citada por
 caminho relativo — que tem barra e não começa com `evidence/`, então o guarda a trataria como
@@ -3115,9 +3117,9 @@ se apressa a afirmar o oposto é instrumento bem feito.**
 para acompanhar um agente trabalhando via lista parada e concluía que nada estava acontecendo —
 enquanto o agente rodava.
 
-Prova do estado curado em `evidence/canal-curado-antes.png` e `evidence/canal-curado-depois.png`.
-O par do estado **morto** (`evidence/prova-canal-agent-runs-antes.png` e
-`evidence/prova-canal-agent-runs-depois.png`) fica intacto — é a única cópia do "antes", e sem ele
+Prova do estado curado em evidence/canal-curado-antes.png e evidence/canal-curado-depois.png.
+O par do estado **morto** (evidence/prova-canal-agent-runs-antes.png e
+evidence/prova-canal-agent-runs-depois.png) fica intacto — é a única cópia do "antes", e sem ele
 o par perde o sentido.
 
 ### E a guarda de evidência passou a ser mecânica
@@ -3168,12 +3170,12 @@ não um segundo roteador que divergiria do primeiro.
 | 13f — autorização vencida recusada: **HTTP 409 e nenhuma atividade nova** (3 → 3) | ✅ |
 | 14 — card sem proposta fica no estado NORMAL, sem slot vazio nem "—" | ✅ |
 
-**As imagens:** `evidence/wave4-13-antes.png` mostra os dois cards da coluna "Primeiro contato"
+**As imagens:** evidence/wave4-13-antes.png mostra os dois cards da coluna "Primeiro contato"
 com a linha do agente e os botões, enquanto os demais ficam no estado normal (é o cenário 14 na
-mesma tela). `evidence/wave4-13-depois-de-aprovar.png` mostra o card decidido de volta ao estado
+mesma tela). evidence/wave4-13-depois-de-aprovar.png mostra o card decidido de volta ao estado
 normal — **sem mudar de altura**, que é o orçamento fixo do §5 segurando.
-`evidence/wave4-13-depois-de-ignorar.png` é o mesmo para a recusa. E
-`evidence/wave4-13-autorizacao-vencida.png` mostra a trava por dentro: o aviso explica o que
+evidence/wave4-13-depois-de-ignorar.png é o mesmo para a recusa. E
+evidence/wave4-13-autorizacao-vencida.png mostra a trava por dentro: o aviso explica o que
 houve e o card **já exibe a proposta nova** — quem clicou vê o que mudou, em vez de um erro seco.
 
 ### Dois achados que valem mais que a feature
@@ -3286,7 +3288,7 @@ não para cobrir esquecimento — esse agora quebra a compilação.
 Cria um **empate real** (segundo negócio aberto, mesmo pipeline, mesmo instante de atividade — a
 única condição em que `resolveActiveLeadForContact` se recusa a adivinhar), deixa o **GET do board**
 detectar pelo código de produção, lê a caixa e **desfaz tudo** no fim. Print:
-`evidence/wave-4-ambiguo-na-caixa.png` — a linha diz *"Próxima ação sem negócio definido — precisa
+evidence/wave-4-ambiguo-na-caixa.png — a linha diz *"Próxima ação sem negócio definido — precisa
 da sua escolha"*.
 
 **Erro meu, corrigido no caminho.** A primeira asserção perguntava se *"Aviso do assistente"*
@@ -3419,11 +3421,11 @@ em que a soma não bate com o número exibido (`30 − 24 − 20 = −14` vira 0
 
 ### O score no card (15) e o vazio honesto (17)
 
-`evidence/wave5-15-card-com-score.png` mostra o card do Carlos com o medidor e `42%` na faixa ③,
+evidence/wave5-15-card-com-score.png mostra o card do Carlos com o medidor e `42%` na faixa ③,
 enquanto os demais cards da mesma tela seguem sem score — o par que o cenário 17 exige na
 **mesma captura**, porque sem ele "não apareceu" é compatível com "não funciona".
 
-`evidence/wave5-15-evidencias-abertas.png` mostra o porquê aberto: `Morno · 42%`, a razão
+evidence/wave5-15-evidencias-abertas.png mostra o porquê aberto: `Morno · 42%`, a razão
 completa (`+36 3 compromissos do cliente, −24 3 objeções em aberto, +10 2 itens de qualificação,
 −10 1 outro fator`) e as três evidências com peso. Repare no rótulo: **"(registro que sustenta)"**,
 não "momento da conversa" — não se fabricou âncora de mensagem para cumprir a frase do cenário.
@@ -3537,7 +3539,7 @@ banco: `Alterou o título`, payload `{"fields":["title"]}`.
 colapsa — seria contada como "ação qualquer" dentro de um bloco), o que chegou ao vivo nesta sessão
 fica **fora** do agrupamento, e a janela é de um minuto.
 
-`evidence/wave6-19-colapso-e-score.png` mostra as duas metades funcionando na mesma tela: as duas
+evidence/wave6-19-colapso-e-score.png mostra as duas metades funcionando na mesma tela: as duas
 edições do mesmo minuto viraram **"E2E Manager · 2 ações"**, enquanto os vários "Mudou de estágio"
 do mesmo ator **não** colapsaram entre si — estão em minutos diferentes, e a pausa é informação.
 O popover do score aparece com as evidências e o rótulo **"(registro que sustenta)"**, herdado do
@@ -3545,7 +3547,7 @@ card por reuso do componente, não por cópia.
 
 ### O dossiê
 
-`evidence/wave6-18-dossie.png`: cabeçalho → timeline → campos, com o Sheet aberto pelo clique no
+evidence/wave6-18-dossie.png: cabeçalho → timeline → campos, com o Sheet aberto pelo clique no
 card. As decisões humanas aparecem como itens separados mesmo sendo do mesmo ator no mesmo minuto.
 
 Decisões que moram no código, não no contrato: **salvar não fecha** (quem edita precisa ver a

@@ -32,4 +32,27 @@ describe("independent confirmed-memory coverage", () => {
     expect(report.dimensions.find(d => d.key === "answer_quality")?.findings)
       .toContainEqual(expect.objectContaining({ code: "memory_claims_require_semantic_review" }));
   });
+  it("uses independent policy failures even when no legacy contact tool was called", () => {
+    const input = run();
+    input.runtimeMessages = [];
+    input.memoryEvaluationRecalls = [{
+      recall_id: "receipt",
+      contact_id: contactId,
+      as_of: "2026-10-03T00:00:00Z",
+      coverage: "complete",
+      provider_status: "local",
+      scope_valid: true,
+      memory_ids: [],
+      required_memory_ids: ["memory-1"],
+      invalid_memory_ids: [],
+      metadata_error_count: 0,
+      uncertain_policy_count: 0,
+      returned_count: 0,
+    }];
+    const report = evaluateAgentRun(input, resolveAgentEvalProfile());
+    expect(report.verdict).toBe("fail");
+    expect(report.dimensions.find((item) => item.key === "answer_quality")?.findings)
+      .toContainEqual(expect.objectContaining({ code: "memory_policy_locked_missing" }));
+    expect(JSON.stringify(report)).not.toContain(contactId);
+  });
 });

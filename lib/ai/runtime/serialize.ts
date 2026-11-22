@@ -12,6 +12,7 @@ const REDACT_KEYS = new Set([
   "password",
   "cpf",
 ]);
+const ONTOLOGY_STATUSES = new Set(["full", "partial", "supported", "unanswerable"]);
 
 function redactValue(value: unknown): unknown {
   if (typeof value === "string") {
@@ -26,6 +27,19 @@ function redactValue(value: unknown): unknown {
     return out;
   }
   return value;
+}
+
+function semanticResultSummary(result: unknown) {
+  const fields = result && typeof result === "object"
+    ? (result as Record<string, unknown>)
+    : {};
+  return {
+    redacted: true,
+    ...(typeof fields.status === "string" && ONTOLOGY_STATUSES.has(fields.status)
+      ? { status: fields.status }
+      : {}),
+    ...(typeof fields.degraded === "boolean" ? { degraded: fields.degraded } : {}),
+  };
 }
 
 interface MinimalStep {
@@ -57,8 +71,17 @@ export function serializeSteps(steps: ReadonlyArray<MinimalStep>): SerializedSte
     const toolEntries = calls.map((call, i) => {
       const match = results[i];
       const result = match?.output ?? match?.result;
+      const toolName = String(call.toolName ?? "unknown");
+      // Semantic rows and questions are model context, not UI trace fields.
+      if (toolName.startsWith("ontology_")) {
+        return {
+          tool_name: toolName,
+          args: { redacted: true },
+          result: result === undefined ? undefined : semanticResultSummary(result),
+        };
+      }
       return {
-        tool_name: String(call.toolName ?? "unknown"),
+        tool_name: toolName,
         args: redactValue(call.input ?? {}),
         result: result === undefined ? undefined : redactValue(result),
       };

@@ -92,6 +92,7 @@ export async function generateReplyDraft(
         kind: "assisted",
         organizationId: input.organizationId,
         runId: draft.id,
+        memoryUsage: { draftId: draft.id, draftGenerationToken: draft.generation_token },
         agent,
         context,
         previous: await latestCheckpoint(pool, input.organizationId, input.contactId),

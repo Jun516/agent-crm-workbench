@@ -92,6 +92,126 @@
       "type": "service",
       "label": "Atomic Mission send policy",
       "sublabel": "Existing command API; reason + idempotency key"
+    },
+    {
+      "id": "motion",
+      "lane": "ui",
+      "col": 6,
+      "type": "service",
+      "label": "Accessible workbench motion",
+      "sublabel": "WorkbenchMotion.tsx + MotionDisclosure; real state only; reduced motion"
+    },
+    {
+      "id": "customer_facts",
+      "lane": "data",
+      "col": 8,
+      "type": "service",
+      "label": "Confirmed SQL customer memory",
+      "sublabel": "ai_customer_memories; TTL / locks / review / replacement lineage"
+    },
+    {
+      "id": "customer_memory_policy",
+      "lane": "runtime",
+      "col": 8,
+      "type": "service",
+      "label": "Freshness-aware SQL recall",
+      "sublabel": "mem0.ts + policy.ts; semantic hits resolve to owned current SQL IDs beyond lexical top-K; independent locks and final hash/privacy fences"
+    },
+    {
+      "id": "customer_memory_candidates",
+      "lane": "data",
+      "col": 9,
+      "type": "service",
+      "label": "Unconfirmed candidates and evidence",
+      "sublabel": "L2 only; exact inbound excerpts; cooldown and conflicts"
+    },
+    {
+      "id": "customer_memory_decisions",
+      "lane": "runtime",
+      "col": 9,
+      "type": "service",
+      "label": "Human memory decisions API",
+      "sublabel": "candidates/route.ts; current owner / manager; version checked"
+    },
+    {
+      "id": "customer_memory_automation",
+      "lane": "runtime",
+      "col": 12,
+      "type": "service",
+      "label": "Evidence-only extraction and nightly maintenance",
+      "sublabel": "customer-memory/jobs.ts, extraction.ts, consolidation.ts; exact lease, TTL and review only"
+    },
+    {
+      "id": "customer_memory_review_ui",
+      "lane": "ui",
+      "col": 13,
+      "type": "service",
+      "label": "Report footer and contact review",
+      "sublabel": "CustomerMemoryCandidates.tsx / CustomerMemoryPanel.tsx; evidence, owner decisions, manager conflicts"
+    },
+    {
+      "id": "customer_memory_request_context",
+      "lane": "runtime",
+      "col": 14,
+      "type": "service",
+      "label": "Fresh task-time SQL context",
+      "sublabel": "context.ts / consumption.ts; L0 > L1; L3 service boundary; final Pi request proofs"
+    },
+    {
+      "id": "customer_memory_receipts",
+      "lane": "data",
+      "col": 15,
+      "type": "service",
+      "label": "Consumed memory receipts",
+      "sublabel": "ai_customer_memory_recalls / usage; IDs, revision and metadata, no body copies"
+    },
+    {
+      "id": "customer_memory_usage_ui",
+      "lane": "ui",
+      "col": 16,
+      "type": "service",
+      "label": "Report and draft usage review",
+      "sublabel": "CustomerMemoryUsage; evidence links and artifact-scoped correction"
+    },
+    {
+      "id": "customer_memory_metrics",
+      "lane": "runtime",
+      "col": 17,
+      "type": "service",
+      "label": "Manager memory governance metrics",
+      "sublabel": "metrics.ts; explicit denominators, backlog, conflict age and corrected reports/drafts"
+    },
+    {
+      "id": "customer_memory_evaluation",
+      "lane": "runtime",
+      "col": 18,
+      "type": "service",
+      "label": "SQL-backed recall policy evaluation",
+      "sublabel": "evaluation.ts + evals/memory-policy.ts; stable historical locks, expiry and provenance; uncertain later edits stay review"
+    },
+    {
+      "id": "customer_memory_review_pages",
+      "lane": "runtime",
+      "col": 19,
+      "type": "service",
+      "label": "Durable bounded conflict review pages",
+      "sublabel": "review-pages.ts + jobs.ts; fixed creation horizon, triangular 50-row ranges and lease-fenced continuation events"
+    },
+    {
+      "id": "customer_memory_activity",
+      "lane": "runtime",
+      "col": 20,
+      "type": "service",
+      "label": "Source-authorized background status and retry",
+      "sublabel": "activity.ts + CustomerMemoryActivity; body-free SQL status, session RLS, current owner/manager, versioned idempotent requeue and actor audit"
+    },
+    {
+      "id": "customer_memory_followup_timing",
+      "lane": "runtime",
+      "col": 21,
+      "type": "service",
+      "label": "Service-scoped follow-up timing",
+      "sublabel": "followup-turn.ts → planFollowupTiming → pi-turn-execution.ts; origin conversation, fresh guards, canonical purpose and consumed-memory receipts"
     }
   ],
   "edges": [
@@ -178,6 +298,186 @@
       "from": "runtime",
       "to": "checkpoint",
       "label": "reads only current authorized conversation boundary"
+    },
+    {
+      "id": "e14",
+      "from": "state",
+      "to": "motion",
+      "label": "canonical lifecycle events and detail snapshots"
+    },
+    {
+      "id": "e15",
+      "from": "motion",
+      "to": "ui",
+      "label": "one-shot new-message entry; immediate errors; keyboard disclosure"
+    },
+    {
+      "id": "customer-facts-selection",
+      "from": "customer_facts",
+      "to": "customer_memory_policy",
+      "label": "current SQL only; expired excluded; remote text never trusted"
+    },
+    {
+      "id": "customer-memory-checkpoint-context",
+      "from": "customer_memory_policy",
+      "to": "checkpoint",
+      "label": "confirmed_customer_memory; separate from service-scoped L3"
+    },
+    {
+      "id": "customer-memory-human-proposal",
+      "from": "customer_memory_decisions",
+      "to": "customer_memory_candidates",
+      "label": "validated source and colleague proposal; never unattended promotion"
+    },
+    {
+      "id": "customer-memory-human-review",
+      "from": "customer_memory_candidates",
+      "to": "customer_memory_decisions",
+      "label": "evidence and revision token; manager arbitrates conflicts"
+    },
+    {
+      "id": "customer-memory-human-confirmed",
+      "from": "customer_memory_decisions",
+      "to": "customer_facts",
+      "label": "current owner / manager confirms through saveCustomerMemory"
+    },
+    {
+      "id": "memory-close-to-worker",
+      "from": "checkpoint",
+      "to": "customer_memory_automation",
+      "label": "close / idle / task completion events, no HTTP in triggers"
+    },
+    {
+      "id": "memory-worker-to-candidate",
+      "from": "customer_memory_automation",
+      "to": "customer_memory_candidates",
+      "label": "gateway hypotheses, exact customer quote; never writes confirmed truth"
+    },
+    {
+      "id": "memory-worker-review",
+      "from": "customer_memory_automation",
+      "to": "customer_facts",
+      "label": "expiry tombstone and needs_review only; locked bodies preserved"
+    },
+    {
+      "id": "memory-review-cards",
+      "from": "customer_memory_candidates",
+      "to": "customer_memory_review_ui",
+      "label": "same current contact queue in report footer and contact dossier"
+    },
+    {
+      "id": "memory-review-command",
+      "from": "customer_memory_review_ui",
+      "to": "customer_memory_decisions",
+      "label": "rewrite / reject / confirm; explicit lock, review and manager arbitration"
+    },
+    {
+      "id": "memory-policy-request",
+      "from": "customer_memory_policy",
+      "to": "customer_memory_request_context",
+      "label": "fresh SQL validation and lock coverage on each request, stale snapshots scrubbed"
+    },
+    {
+      "id": "memory-context-runtime",
+      "from": "customer_memory_request_context",
+      "to": "runtime",
+      "label": "separate L0 / confirmed L1 / current L3 / L4 channel marker"
+    },
+    {
+      "id": "memory-consumption-proof",
+      "from": "runtime",
+      "to": "customer_memory_receipts",
+      "label": "successful model step acknowledges the exact current request before receipt"
+    },
+    {
+      "id": "memory-usage-visible",
+      "from": "customer_memory_receipts",
+      "to": "customer_memory_usage_ui",
+      "label": "report or current draft generation; RLS-filtered evidence and paginated history"
+    },
+    {
+      "id": "memory-correction-loop",
+      "from": "customer_memory_usage_ui",
+      "to": "customer_facts",
+      "label": "current authorized correction flags exact used revision for human review; no body/lock overwrite"
+    },
+    {
+      "id": "memory-candidates-metrics",
+      "from": "customer_memory_candidates",
+      "to": "customer_memory_metrics",
+      "label": "confirmed / rejected decisions and aging backlog"
+    },
+    {
+      "id": "memory-usage-metrics",
+      "from": "customer_memory_receipts",
+      "to": "customer_memory_metrics",
+      "label": "unique root reports and draft IDs, corrected-use ratio"
+    },
+    {
+      "id": "memory-metrics-review",
+      "from": "customer_memory_metrics",
+      "to": "customer_memory_review_ui",
+      "label": "manager contact panel; prioritize review and observe decision outcomes"
+    },
+    {
+      "id": "memory-receipts-evaluation",
+      "from": "customer_memory_receipts",
+      "to": "customer_memory_evaluation",
+      "label": "native consumption proof and independently stable SQL policy"
+    },
+    {
+      "id": "memory-policy-evaluation",
+      "from": "customer_memory_policy",
+      "to": "customer_memory_evaluation",
+      "label": "locked / valid / scope / review invariants; local fallback is valid"
+    },
+    {
+      "id": "memory-eval-visible",
+      "from": "customer_memory_evaluation",
+      "to": "ui",
+      "label": "existing workbench evaluation API and panel; policy failures cannot be graded green"
+    },
+    {
+      "id": "memory-review-page-input",
+      "from": "customer_memory_automation",
+      "to": "customer_memory_review_pages",
+      "label": "maintenance/business review source and current SQL versions"
+    },
+    {
+      "id": "memory-review-page-next",
+      "from": "customer_memory_review_pages",
+      "to": "customer_memory_automation",
+      "label": "idempotent next event and result in one transaction; next worker claim continues"
+    },
+    {
+      "id": "memory-worker-activity",
+      "from": "customer_memory_automation",
+      "to": "customer_memory_activity",
+      "label": "durable job state, unavailable and continuation receipts; no raw source/error bodies"
+    },
+    {
+      "id": "memory-activity-screen",
+      "from": "customer_memory_activity",
+      "to": "customer_memory_review_ui",
+      "label": "contact and report explanation, configuration link and current retry capabilities"
+    },
+    {
+      "id": "memory-activity-retry",
+      "from": "customer_memory_activity",
+      "to": "customer_memory_automation",
+      "label": "same bounded source requeued once; actual queue claim resumes L2-only extraction"
+    },
+    {
+      "id": "memory-context-followup-timing",
+      "from": "customer_memory_request_context",
+      "to": "customer_memory_followup_timing",
+      "label": "refresh valid SQL L1 before native request; reject stale service and foreign subject"
+    },
+    {
+      "id": "memory-followup-timing-receipt",
+      "from": "customer_memory_followup_timing",
+      "to": "customer_memory_receipts",
+      "label": "followup_decide_timing job + original conversation; only acknowledged consumption"
     }
   ],
   "cards": []

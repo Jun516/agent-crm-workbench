@@ -1,0 +1,523 @@
+{
+  "version": "1.0.0",
+  "contractVersion": "1.0.0",
+  "digest": "ace34ca9560cf88d9840f0fefbd2012c5bf2f6a85a287fc36313a79124ba5ba7",
+  "catalog": {
+    "contractVersion": "1.0.0",
+    "version": "1.0.0",
+    "entities": [
+      {
+        "id": "contact",
+        "description": "Contato; não implica cliente.",
+        "aliases": ["contato"],
+        "table": "contacts",
+        "fields": [
+          {
+            "name": "id",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "organization_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "is_merged_into",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "is_anonymized",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          }
+        ],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "opportunity",
+        "description": "Mapeamento técnico de negócio em crm_leads; sentido comercial proposto.",
+        "aliases": ["negócio", "oportunidade"],
+        "table": "crm_leads",
+        "fields": [
+          {
+            "name": "id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "organization_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "contact_id",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "status",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "value_cents",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "currency",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "created_at",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "last_activity_at",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "closed_at",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          }
+        ],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "conversation",
+        "description": "Conversa, inclusive grupo; não implica negócio.",
+        "aliases": ["conversa"],
+        "table": "conversations",
+        "fields": [
+          {
+            "name": "id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "organization_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "contact_id",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "is_group",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          }
+        ],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "activity",
+        "description": "Atividade do negócio; não implica follow-up válido.",
+        "aliases": ["atividade"],
+        "table": "crm_lead_activities",
+        "fields": [
+          {
+            "name": "id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "organization_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "lead_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "contact_id",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "performed_at",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "type",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          }
+        ],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "task",
+        "description": "Tarefa CRM; pode ser avulsa e não é Mission.",
+        "aliases": ["tarefa"],
+        "table": "crm_tasks",
+        "fields": [
+          {
+            "name": "id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "organization_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "lead_id",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "contact_id",
+            "sensitivity": "personal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "due_date",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          },
+          {
+            "name": "status",
+            "sensitivity": "internal",
+            "source": {
+              "path": "docs/audits/ontology-31/fields-v1.md",
+              "detail": "Campos físicos e nulidade"
+            }
+          }
+        ],
+        "source": {
+          "path": "supabase/migrations/20260903143000_0210_tarefas_do_crm.sql",
+          "detail": "Tabela e FKs; types gerados não incluem crm_tasks"
+        }
+      }
+    ],
+    "relations": [
+      {
+        "id": "opportunity_contact",
+        "from": "opportunity",
+        "to": "contact",
+        "fromField": "contact_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": true,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "Contato tem zero a muitos negócios; consultar todos. Para roteamento de atividade usar resolveActiveLeadForContact; empate ou nenhum aberto não roteia."
+      },
+      {
+        "id": "conversation_contact",
+        "from": "conversation",
+        "to": "contact",
+        "fromField": "contact_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": false,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "Grupo e conversa individual diferem; não atribuir conversa a negócio por contato."
+      },
+      {
+        "id": "activity_opportunity",
+        "from": "activity",
+        "to": "opportunity",
+        "fromField": "lead_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": false,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "Visibilidade do negócio deve ser respeitada."
+      },
+      {
+        "id": "activity_contact",
+        "from": "activity",
+        "to": "contact",
+        "fromField": "contact_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": true,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "Contato da atividade não prova correspondência ao contato atual do negócio."
+      },
+      {
+        "id": "task_opportunity",
+        "from": "task",
+        "to": "opportunity",
+        "fromField": "lead_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": true,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "Tarefa pode ser avulsa; interseção de visibilidade."
+      },
+      {
+        "id": "task_contact",
+        "from": "task",
+        "to": "contact",
+        "fromField": "contact_id",
+        "toField": "id",
+        "cardinality": "many_to_one",
+        "nullable": true,
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        },
+        "visibility": "Exigir organização confiável e visibilidade em ambos os extremos; FK não autoriza leitura.",
+        "ambiguity": "FK permite contato de outra organização; recusar vínculo inconsistente e validar ambos extremos."
+      }
+    ],
+    "metrics": [
+      {
+        "id": "stagnation",
+        "aliases": [],
+        "definition": "Estagnação comercial não tem definição aprovada; radar existente é uma regra específica.",
+        "status": "proposed",
+        "origin": "human",
+        "review": null,
+        "version": "1.0.0",
+        "entity": "opportunity",
+        "fields": ["created_at", "last_activity_at", "status"],
+        "dependsOn": [],
+        "aggregation": "Não definida para consulta genérica",
+        "dateField": "last_activity_at",
+        "timezone": "Exigir fuso para datas civis",
+        "currency": "Separar moedas; nunca converter sem fonte e data",
+        "scope": "Organização e visibilidade autorizadas",
+        "missing": ["Definição de estagnação", "Janela e fuso"],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "high_value",
+        "aliases": [],
+        "definition": "Alto valor exige limiar e moeda explícitos; valor nulo não é zero.",
+        "status": "unanswerable",
+        "origin": "human",
+        "review": null,
+        "version": "1.0.0",
+        "entity": "opportunity",
+        "fields": ["value_cents", "currency"],
+        "dependsOn": [],
+        "aggregation": "Não definida para consulta genérica",
+        "dateField": null,
+        "timezone": "Exigir fuso para datas civis",
+        "currency": "Separar moedas; nunca converter sem fonte e data",
+        "scope": "Organização e visibilidade autorizadas",
+        "missing": ["Limiar ou percentil", "Moeda, âmbito e período"],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "valid_follow_up",
+        "aliases": [],
+        "definition": "Atividade não comprova contato efetivo.",
+        "status": "unanswerable",
+        "origin": "human",
+        "review": null,
+        "version": "1.0.0",
+        "entity": "opportunity",
+        "fields": [],
+        "dependsOn": [],
+        "aggregation": "Não definida para consulta genérica",
+        "dateField": null,
+        "timezone": "Exigir fuso para datas civis",
+        "currency": "Separar moedas; nunca converter sem fonte e data",
+        "scope": "Organização e visibilidade autorizadas",
+        "missing": ["Canal, direção, entrega, ator e janela"],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "conversion",
+        "aliases": [],
+        "definition": "Conversão exige coorte e definição de transições.",
+        "status": "unanswerable",
+        "origin": "human",
+        "review": null,
+        "version": "1.0.0",
+        "entity": "opportunity",
+        "fields": ["status", "created_at", "closed_at"],
+        "dependsOn": [],
+        "aggregation": "Não definida para consulta genérica",
+        "dateField": "closed_at",
+        "timezone": "Exigir fuso para datas civis",
+        "currency": "Separar moedas; nunca converter sem fonte e data",
+        "scope": "Organização e visibilidade autorizadas",
+        "missing": ["Coorte, denominador, período e reentradas", "Completude histórica"],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      },
+      {
+        "id": "opportunity_value",
+        "aliases": [],
+        "definition": "Valor em centavos por moeda, nullable e distinto de receita.",
+        "status": "proposed",
+        "origin": "human",
+        "review": null,
+        "version": "1.0.0",
+        "entity": "opportunity",
+        "fields": ["value_cents", "currency"],
+        "dependsOn": [],
+        "aggregation": "Não definida para consulta genérica",
+        "dateField": null,
+        "timezone": "Exigir fuso para datas civis",
+        "currency": "Separar moedas; nunca converter sem fonte e data",
+        "scope": "Organização e visibilidade autorizadas",
+        "missing": ["Agregação e tratamento de nulos"],
+        "source": {
+          "path": "docs/audits/ontology-31/README.md",
+          "detail": "Entidades e relações verificadas no baseline"
+        }
+      }
+    ],
+    "actions": [
+      {
+        "id": "update_opportunity",
+        "capability": "crm_update_lead",
+        "service": "app/api/v1/leads/_handler.ts",
+        "risk": "write",
+        "prerequisites": [
+          "Identificar negócio explicitamente",
+          "Autorização, escopo e aprovação do fluxo existente"
+        ],
+        "source": {
+          "path": "lib/mcp/tools/leads.ts",
+          "detail": "Definição crm_update_lead"
+        }
+      }
+    ]
+  }
+}

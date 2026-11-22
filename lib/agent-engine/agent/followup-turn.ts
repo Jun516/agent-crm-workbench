@@ -505,7 +505,7 @@ async function runFlowDrivenTurn(
   const context = await getLeadContext(
     pool,
     deps.crmCfg,
-    { tenantId: target.tenantId, leadId: target.leadId, fuso: await fusoDaOrganizacao(pool, target.tenantId, runLog) },
+    { tenantId: target.tenantId, leadId: target.leadId, conversationId: target.conversationId, fuso: await fusoDaOrganizacao(pool, target.tenantId, runLog) },
     { historyLimit: deps.knobs.historyLimit, maxTokens: deps.knobs.maxContextTokens },
   );
   if (!context.ok) {
@@ -520,7 +520,14 @@ async function runFlowDrivenTurn(
       esperas,
       ...(deps.knobs.followupAi?.model !== undefined ? { model: deps.knobs.followupAi.model } : {}),
     },
-    { log: runLog, clock, ...(deps.runtime ? { runtime: deps.runtime } : {}) },
+    {
+      log: runLog,
+      clock,
+      ...(deps.runtime ? { runtime: deps.runtime } : {}),
+      beforeRead: async () => {
+        await requireCurrentServiceBoundary(pool, parseServiceBoundary(job.payload.service_boundary));
+      },
+    },
   );
   await complete(pool, {
     jobId:job.id,jobClaim:claimOfJob(job),

@@ -62,7 +62,7 @@ Agent 授权来源 + 安装 KB 白名单
 
 为核对测试是否能抓住旧缺陷，临时用原 ZIP 的 WeKnora、Mem0 和联系人工具实现运行新增反例：**2 文件中 12 用例失败、15 通过，退出码 1**。随后恢复本次代码，逐文件核对 SHA-256 与备份字节一致，再运行四文件，仍为 **59 通过、退出码 0**。实际项目 Prettier 检查本次负责的十个源文件/文档通过。
 
-日志：`validation-memory-knowledge-restored.log`、`red-control-memory-knowledge.log` 与 `red-control-memory-knowledge.json`。这是精确范围的本地回归，不等同于全项目测试、数据库 RLS 运行或真实供应商验收；测试只使用内存替身及本机 HTTP receiver，未连接厂商或调用模型。
+上述历史过程日志保存在本地工程归档。测试使用内存替身和本机 HTTP 接收端。当前数据库和浏览器验证入口见 [合并升级验证](../testing/verify-crm.md)。
 
 ## Living System Checklist
 

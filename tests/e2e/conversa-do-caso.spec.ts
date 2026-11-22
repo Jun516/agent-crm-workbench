@@ -318,6 +318,7 @@ test.describe("conversar com a IA que abriu o caso", () => {
           fundo: estilo.backgroundColor,
         },
         campo: { largura: Math.round(campoEl.getBoundingClientRect().width) },
+        fonteDaPagina: getComputedStyle(document.body).fontFamily,
         rolagemHorizontal:
           document.documentElement.scrollWidth - document.documentElement.clientWidth,
         janela: { largura: window.innerWidth, altura: window.innerHeight },
@@ -334,10 +335,9 @@ test.describe("conversar com a IA que abriu o caso", () => {
     expect(m.painel.x).toBeGreaterThanOrEqual(0);
     expect(m.painel.x + m.painel.largura).toBeLessThanOrEqual(m.janela.largura);
     expect(m.rolagemHorizontal, "página com rolagem horizontal").toBeLessThanOrEqual(0);
-    // A fonte e a cor são as do PRODUTO, não as do sistema: um botão em
-    // Helvetica cinza é o sintoma de tema não carregado, e ele passa
-    // despercebido em screenshot.
-    expect(m.botao.fonte).toMatch(/Atkinson/i);
+    // Mede a fonte e a cor do tema aplicado na página.
+    expect(m.botao.fonte).toBe(m.fonteDaPagina);
+    expect(m.botao.fonte).toMatch(/Noto Sans SC.*system-ui/i);
     expect(m.botao.fundo).toMatch(/^rgba?\(/);
     expect(m.botao.fundo).not.toBe("rgba(0, 0, 0, 0)");
 

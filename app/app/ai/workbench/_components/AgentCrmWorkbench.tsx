@@ -1,10 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CustomerMemoryCandidates } from "@/components/ai/CustomerMemoryCandidates";
+import { CustomerMemoryUsage } from "@/components/ai/CustomerMemoryUsage";
 import { MissionSendControl } from "./MissionSendControl";
+import { MissionDirectionControl } from "./MissionDirectionControl";
+import { OntologyEvidence } from "./OntologyEvidence";
+import {
+  EXPERT_CONFLICT_UNRESOLVED,
+  expertConflictNotice,
+  expertConflictTimelineNote,
+} from "@/lib/ai/agents/expert-conflict-governance";
 import { RefinementControls } from "./RefinementControls";
 import { JevEvaluationControls } from "./JevEvaluationControls";
 import type { JevChoiceReview } from "@/lib/ai/evals/contracts";
+import { MotionDisclosure } from "@/components/ui/motion-disclosure";
+import {
+  WorkbenchMessage,
+  WorkbenchRunStatus,
+  statusFromWorkbenchEvent,
+  statusFromWorkbenchSnapshot,
+} from "./WorkbenchMotion";
 import {
   Sheet,
   SheetContent,
@@ -55,6 +71,7 @@ type Proposal = {
   can_undo?: boolean;
 };
 type Detail = Run & {
+  scope?: Scope | null;
   result_document?: {
     revision: number;
     trust: "model_submitted";
@@ -70,6 +87,9 @@ type Detail = Run & {
     goal: string;
     acceptance_criteria: string;
     customer_send_paused: boolean;
+    current_direction?: string | null;
+    direction_revision?: number | string | null;
+    direction_consumed_revision?: number | string | null;
     acceptance_contract: {
       revision: 1;
       checks: Array<
@@ -172,6 +192,7 @@ const EVENT_LABELS: Record<string, string> = {
   specialist_failed: "只读 Specialist 失败",
   collaboration_conflict: "Specialist 证据冲突",
   collaboration_completed: "多 Agent 审查完成",
+  manager_direction_consumed: "模型已读取负责人方向",
   usage_reported: "用量已记录",
 };
 
@@ -220,8 +241,18 @@ const fetchDetail = async (runId: string): Promise<Detail> => {
   ]);
   const detailBody = await detailResponse.json();
   if (!detailResponse.ok) throw new Error(detailBody.error?.message ?? "无法读取运行详情");
+  const loaded = detailBody.data as Detail;
+  const status = statusFromWorkbenchSnapshot(loaded.status, loaded.events ?? []);
+  const failure =
+    status === "failed"
+      ? loaded.events?.findLast((event) => event.event_type === "run_failed")
+      : undefined;
   return {
-    ...detailBody.data,
+    ...loaded,
+    status,
+    error_code:
+      loaded.error_code ??
+      (typeof failure?.payload.code === "string" ? failure.payload.code : null),
     ...evaluation,
   };
 };
@@ -231,11 +262,13 @@ export function AgentCrmWorkbench({
   modelConfigured,
   canCopy,
   initialLead,
+  readOnly = false,
 }: {
   agents: Agent[];
   modelConfigured: boolean;
   canCopy: boolean;
   initialLead?: { id: string; title: string; pipelineId: string } | null;
+  readOnly?: boolean;
 }) {
   const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
   const [task, setTask] = useState("");
@@ -256,6 +289,9 @@ export function AgentCrmWorkbench({
   const detailsButtonRef = useRef<HTMLButtonElement>(null);
   const lastPanel = useRef<"settings" | "details">("settings");
   const messagesRef = useRef<HTMLDivElement>(null);
+  const followMessages = useRef(true);
+  const submissionSequence = useRef(0);
+  const [turnMotion, setTurnMotion] = useState({ key: "initial", live: false });
   const busyRef = useRef(false);
   const cancellingRef = useRef(false);
   const [cancelling, setCancelling] = useState(false);
@@ -388,6 +424,8 @@ export function AgentCrmWorkbench({
     setBusy(true);
     setPanel(null);
     setError("");
+    followMessages.current = true;
+    setTurnMotion({ key: `submitted:${++submissionSequence.current}`, live: true });
     setSubmittedTask(task.trim());
     if (detail) setPreviousTurns((turns) => [...turns, detail]);
     setDetail(null);
@@ -467,14 +505,13 @@ export function AgentCrmWorkbench({
     initialStatus: string,
   ) => {
     let sequence = initialEvents.reduce((max, event) => Math.max(max, event.sequence), 0);
+    const terminalStatuses = ["completed", "partial", "failed", "cancelled"];
     // The worker can finish before the first detail request reaches the browser.
     // In that case the initial event page already contains the terminal event;
     // starting the stream at its last sequence would otherwise wait forever for
     // a terminal event that has intentionally been skipped during replay.
     let status = initialStatus;
-    while (
-      !["completed", "partial", "failed", "cancelled", "awaiting_confirmation"].includes(status)
-    ) {
+    while (!terminalStatuses.includes(status) && status !== "awaiting_confirmation") {
       const response = await fetch(`/api/v1/ai/workbench/runs/${runId}/events?after=${sequence}`);
       if (!response.ok || !response.body) return;
       const reader = response.body.getReader();
@@ -493,23 +530,24 @@ export function AgentCrmWorkbench({
             const event = JSON.parse(dataLine.slice(6)) as EventRow;
             if (!event.sequence || event.sequence <= sequence) continue;
             sequence = event.sequence;
-            setDetail((current) =>
-              current?.id === runId ? { ...current, events: [...current.events, event] } : current,
-            );
-            if (
-              ["run_completed", "run_partial", "run_failed", "run_cancelled"].includes(
-                event.event_type,
-              )
-            ) {
-              status =
-                event.event_type === "run_completed"
-                  ? "completed"
-                  : event.event_type === "run_partial"
-                    ? "partial"
-                    : event.event_type === "run_failed"
-                      ? "failed"
-                      : "cancelled";
-            }
+            const eventStatus = statusFromWorkbenchEvent(event.event_type);
+            if (eventStatus && !terminalStatuses.includes(status)) status = eventStatus;
+            setDetail((current) => {
+              if (current?.id !== runId) return current;
+              // A cancellation/detail read may already have observed a terminal
+              // state while an older stream chunk was in flight. Never revive it.
+              const terminal = terminalStatuses.includes(current.status);
+              return {
+                ...current,
+                ...(!terminal && eventStatus ? { status: eventStatus } : {}),
+                ...(!terminal &&
+                event.event_type === "run_failed" &&
+                typeof event.payload.code === "string"
+                  ? { error_code: event.payload.code }
+                  : {}),
+                events: [...current.events, event],
+              };
+            });
           } catch {
             /* 忽略心跳与不完整片段，下一块继续解析。 */
           }
@@ -651,6 +689,7 @@ export function AgentCrmWorkbench({
     () => detail?.proposals.filter((proposal) => proposal.status === "pending") ?? [],
     [detail],
   );
+  const conflictNotice = detail ? expertConflictNotice(detail.events) : null;
 
   const activeRun = Boolean(
     detail && ["queued", "running", "awaiting_confirmation"].includes(detail.status),
@@ -661,7 +700,9 @@ export function AgentCrmWorkbench({
 
   useEffect(() => {
     const messages = messagesRef.current;
-    if (messages) messages.scrollTop = messages.scrollHeight;
+    // Reading earlier messages is intentional. Polls/results must not pull the
+    // operator back down; submitting a new task or opening history opts in.
+    if (messages && followMessages.current) messages.scrollTop = messages.scrollHeight;
   }, [detail?.id, detail?.status, detail?.final_text, submittedTask, previousTurns.length]);
 
   useEffect(() => {
@@ -710,6 +751,8 @@ export function AgentCrmWorkbench({
     readingHistory.current += 1;
     evaluationRequest.current = null;
     setReadingEvaluation(null);
+    followMessages.current = true;
+    setTurnMotion({ key: "initial", live: false });
     setDetail(null);
     setPreviousTurns([]);
     setSubmittedTask("");
@@ -733,6 +776,8 @@ export function AgentCrmWorkbench({
     try {
       const loaded = await fetchDetail(runId);
       if (request !== readingHistory.current) return;
+      followMessages.current = true;
+      setTurnMotion({ key: `history:${runId}`, live: false });
       setDetail(loaded);
       setPreviousTurns([]);
       setSubmittedTask("");
@@ -805,6 +850,11 @@ export function AgentCrmWorkbench({
         ref={messagesRef}
         role="region"
         aria-label="Agent 对话"
+        onScroll={(event) => {
+          const region = event.currentTarget;
+          followMessages.current =
+            region.scrollHeight - region.clientHeight - region.scrollTop <= 48;
+        }}
         tabIndex={0}
         className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 sm:p-6"
       >
@@ -847,25 +897,53 @@ export function AgentCrmWorkbench({
         ))}
         {displayedTask && (
           <section className="mx-auto max-w-3xl space-y-3" aria-label="当前运行">
-            <p className="ml-auto w-fit max-w-[90%] rounded-xl bg-muted px-4 py-3 text-sm break-words whitespace-pre-wrap">
+            <WorkbenchMessage key={`${turnMotion.key}:task`} kind="task" animate={turnMotion.live}>
               {displayedTask}
-            </p>
-            <div role="status" className="text-xs text-muted-foreground">
-              {detail
-                ? `运行状态：${detail.status}`
-                : busy
-                  ? "正在提交任务…"
-                  : "无法确认运行状态，请先查看最近运行"}
-              {latestEvent ? ` · ${eventLabel(latestEvent)}` : ""}
+            </WorkbenchMessage>
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+            >
+              {detail ? (
+                <WorkbenchRunStatus status={detail.status} />
+              ) : busy ? (
+                "正在提交任务…"
+              ) : (
+                "无法确认运行状态，请先查看最近运行"
+              )}
+              {latestEvent ? <span>{eventLabel(latestEvent)}</span> : null}
             </div>
             {detail?.final_text && (
-              <article className="rounded-lg bg-surface p-4 text-sm leading-6 break-words whitespace-pre-wrap">
+              <WorkbenchMessage
+                key={`${turnMotion.key}:result`}
+                kind="result"
+                animate={turnMotion.live && !["failed", "cancelled"].includes(detail.status)}
+              >
                 {detail.final_text}
-              </article>
+              </WorkbenchMessage>
             )}
-            {detail?.error_code && (
+            {detail?.scope?.contactId &&
+              ["completed", "partial", "failed", "cancelled"].includes(detail.status) && (
+                <CustomerMemoryUsage
+                  key={`${detail.id}:usage`}
+                  context="workbench"
+                  id={detail.id}
+                  readOnly={readOnly}
+                />
+              )}
+            {detail?.scope?.contactId && ["completed", "partial"].includes(detail.status) && (
+              <CustomerMemoryCandidates
+                key={detail.id}
+                contactId={detail.scope.contactId}
+                runId={detail.id}
+                readOnly={readOnly}
+              />
+            )}
+            {detail?.error_code === EXPERT_CONFLICT_UNRESOLVED ? (
+              <p className="text-sm text-destructive">专家冲突未解决，CRM 写入已停止。</p>
+            ) : detail?.error_code ? (
               <p className="text-sm text-destructive">运行错误：{detail.error_code}</p>
-            )}
+            ) : null}
             {detail?.evaluationError && (
               <button
                 onClick={() => openPanel("details")}
@@ -960,7 +1038,7 @@ export function AgentCrmWorkbench({
               type="button"
               disabled={cancelling}
               onClick={() => void cancelRun()}
-              className="shrink-0 rounded-md border px-3 py-3 text-sm"
+              className="workbench-composer-action shrink-0 rounded-md border px-3 py-3 text-sm"
             >
               {cancelling ? "取消中…" : "取消运行"}
             </button>
@@ -968,7 +1046,7 @@ export function AgentCrmWorkbench({
             <button
               type="submit"
               disabled={!modelConfigured || cannotStart || !task.trim() || !selected}
-              className="shrink-0 rounded-md bg-primary px-3 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className="workbench-composer-action shrink-0 rounded-md bg-primary px-3 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
               {busy ? "运行中…" : "运行 Agent"}
             </button>
@@ -1184,9 +1262,27 @@ export function AgentCrmWorkbench({
                             客户发送已被负责人暂停；旧审批不能继续发送。
                           </p>
                         )}
-                        <MissionSendControl
+                        <MissionDirectionControl
                           key={detail.mission.id}
                           mission={detail.mission}
+                          readOnly={readOnly}
+                          onAccepted={async ({ runId }) => {
+                            const request = ++readingHistory.current;
+                            const loaded = await fetchDetail(runId);
+                            if (request !== readingHistory.current) return;
+                            followMessages.current = true;
+                            setTurnMotion({ key: `history:${runId}`, live: false });
+                            setDetail(loaded);
+                            const url = new URL(window.location.href);
+                            url.searchParams.set("run", runId);
+                            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+                            await loadRuns();
+                          }}
+                        />
+                        <MissionSendControl
+                          key={`${detail.mission.id}:send`}
+                          mission={detail.mission}
+                          readOnly={readOnly}
                           onUpdated={async (paused) => {
                             const runId = detail.id;
                             setDetail((current) =>
@@ -1214,6 +1310,12 @@ export function AgentCrmWorkbench({
                             当前原因：{detail.mission.blocked_reason}
                           </p>
                         )}
+                      </section>
+                    )}
+                    {conflictNotice && (
+                      <section className="rounded-lg border p-3 text-sm" aria-label={conflictNotice.title}>
+                        <p className="font-medium text-destructive">{conflictNotice.title}</p>
+                        <p className="mt-1 text-muted-foreground">{conflictNotice.body}</p>
                       </section>
                     )}
                     <div className="rounded-lg bg-muted/60 p-3 text-sm">
@@ -1421,11 +1523,16 @@ export function AgentCrmWorkbench({
                         </div>
                         <div className="mt-2 space-y-1">
                           {detail.evaluation.dimensions.map((dimension) => (
-                            <details key={dimension.key} className="rounded-md border p-2">
-                              <summary className="cursor-pointer text-muted-foreground">
-                                {dimension.label} · {dimension.verdict}
-                                {dimension.score === null ? "" : ` · ${dimension.score}`}
-                              </summary>
+                            <MotionDisclosure
+                              key={dimension.key}
+                              className="rounded-md border p-2"
+                              title={
+                                <>
+                                  {dimension.label} · {dimension.verdict}
+                                  {dimension.score === null ? "" : ` · ${dimension.score}`}
+                                </>
+                              }
+                            >
                               {dimension.findings.length > 0 ? (
                                 <ul className="mt-2 space-y-1">
                                   {dimension.findings.map((finding) => (
@@ -1442,7 +1549,7 @@ export function AgentCrmWorkbench({
                                   此项检查未发现问题；不代表业务结果已验收。
                                 </p>
                               )}
-                            </details>
+                            </MotionDisclosure>
                           ))}
                         </div>
                         <p className="mt-2 text-muted-foreground">
@@ -1556,28 +1663,39 @@ export function AgentCrmWorkbench({
                 </div>
 
                 {detail && (
-                  <details className="rounded-lg border p-3">
-                    <summary className="cursor-pointer text-sm font-medium">
-                      执行时间线 · {detail.events.length} 条事件
-                    </summary>
+                  <MotionDisclosure
+                    className="rounded-lg border p-3"
+                    title={<>执行时间线 · {detail.events.length} 条事件</>}
+                  >
                     <div className="mt-3 space-y-3 break-words">
-                      {detail?.events.map((event) => (
-                        <div key={event.id} className="flex gap-3 text-sm">
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                          <div>
-                            <p className="font-medium">{eventLabel(event)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(event.created_at).toLocaleTimeString()} ·{" "}
-                              {Object.entries(event.payload ?? {})
-                                .filter(([key]) => !/id$/.test(key))
-                                .map(([key, value]) => `${key}: ${String(value)}`)
-                                .join(" · ")}
-                            </p>
+                      {detail.events.map((event) => {
+                        const conflictNote = expertConflictTimelineNote(event);
+                        return (
+                          <div key={event.id} className="flex gap-3 text-sm">
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                            <div>
+                              <p className="font-medium">{eventLabel(event)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(event.created_at).toLocaleTimeString()} ·{" "}
+                                {Object.entries(event.payload ?? {})
+                                  .filter(([key]) => !/id$/.test(key))
+                                  .map(([key, value]) => `${key}: ${String(value)}`)
+                                  .join(" · ")}
+                              </p>
+                              {conflictNote && <p className="text-xs text-destructive">{conflictNote}</p>}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  </details>
+                  </MotionDisclosure>
+                )}
+                {detail && (
+                  <OntologyEvidence
+                    entries={detail.events.filter(
+                      (event) => event.event_type === "tool_completed" && event.payload.ontologyObservation === true,
+                    )}
+                  />
                 )}
                 {Boolean(detail?.observed_evidence?.length) && (
                   <section
@@ -1589,14 +1707,16 @@ export function AgentCrmWorkbench({
                       来自本次运行成功工具观察，已重新核对当前来源权限。索引版本不等于商业政策批准。
                     </p>
                     {detail!.observed_evidence!.map((item) => (
-                      <details
+                      <MotionDisclosure
                         key={`${item.id}:${item.revision}`}
                         className="rounded-md border p-2"
+                        title={
+                          <>
+                            {item.title}
+                            {item.index_status === "superseded" ? " · 索引已有更新，请重查" : ""}
+                          </>
+                        }
                       >
-                        <summary className="cursor-pointer font-medium">
-                          {item.title}
-                          {item.index_status === "superseded" ? " · 索引已有更新，请重查" : ""}
-                        </summary>
                         <p className="mt-2 break-words whitespace-pre-wrap">{item.excerpt}</p>
                         <p className="mt-2 text-xs break-all text-muted-foreground">
                           {item.revision_kind === "index_version" ? "索引版本" : "记忆快照"}：
@@ -1616,7 +1736,7 @@ export function AgentCrmWorkbench({
                             查看来源
                           </a>
                         )}
-                      </details>
+                      </MotionDisclosure>
                     ))}
                   </section>
                 )}

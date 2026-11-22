@@ -314,6 +314,24 @@
       "tag": "workbench_resume",
       "label": "Pi Workbench · retomada durável",
       "sublabel": "Após decisão humana ou escrita reversível, continua das mensagens Pi persistidas"
+    },
+    {
+      "id": "customer_memory_extract",
+      "lane": "app",
+      "col": 6,
+      "type": "backend",
+      "label": "Memory candidate extraction",
+      "tag": "customer_memory_extract",
+      "sublabel": "Scoped close, checkpoint and task events create L2 candidates with evidence"
+    },
+    {
+      "id": "customer_memory_consolidate",
+      "lane": "app",
+      "col": 7,
+      "type": "backend",
+      "label": "Nightly memory maintenance",
+      "tag": "customer_memory_consolidate",
+      "sublabel": "Deduplicates candidates, expires facts and preserves locks"
     }
   ],
   "edges": [
@@ -723,6 +741,30 @@
       "to": "turn",
       "label": "observação aprovada volta ao loop sem reiniciar a tarefa",
       "route": "drop"
+    },
+    {
+      "id": "memory-event-extract",
+      "from": "eventlog",
+      "to": "customer_memory_extract",
+      "label": "Durable scoped event"
+    },
+    {
+      "id": "memory-extract-review",
+      "from": "customer_memory_extract",
+      "to": "memoryscreen",
+      "label": "Reviewer confirms evidence-backed candidates"
+    },
+    {
+      "id": "memory-event-maintain",
+      "from": "eventlog",
+      "to": "customer_memory_consolidate",
+      "label": "Next local nightly job"
+    },
+    {
+      "id": "memory-maintain-review",
+      "from": "customer_memory_consolidate",
+      "to": "memoryscreen",
+      "label": "Expiry, conflict and review tasks"
     }
   ],
   "cards": [

@@ -59,6 +59,8 @@ export interface AgentEvalRunInput {
     memoryIds: string[];
     asOf: string;
   }>;
+  /** Body-free SQL consumption receipts and independently checked stable policy rows. */
+  memoryEvaluationRecalls?: MemoryEvaluationRecall[];
   collaborationRuns?: Array<{
     id: string;
     specialistKey: string | null;
@@ -67,6 +69,21 @@ export interface AgentEvalRunInput {
     claimCount?: number;
     evidenceCount?: number;
   }>;
+}
+
+export interface MemoryEvaluationRecall {
+  recall_id: string;
+  contact_id: string;
+  as_of: string;
+  coverage: "complete" | "partial" | "unavailable";
+  provider_status: string;
+  scope_valid: boolean;
+  memory_ids: string[];
+  required_memory_ids: string[];
+  invalid_memory_ids: string[];
+  metadata_error_count: number;
+  uncertain_policy_count: number;
+  returned_count: number;
 }
 
 export interface AgentEvalFinding {

@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 # Sem a barra tambem: `node_modules/` casa so com diretorio, e um SYMLINK
 # chamado node_modules (worktree apontando para a instalacao principal) passa
 # batido e vai parar no commit. Aconteceu no PR #83.
@@ -195,7 +196,8 @@ __pycache__/
 # Public portfolio snapshot: keep unreviewed operational evidence locally.
 # These screenshots/recordings can contain customer conversations or accounts.
 # Authored product assets under public/, docs/brand/ and docs/design/ stay included.
-/evidence/
+/evidence/*
+!/evidence/README.md
 /docs/evidence/
 /docs/testing/screenshots/
 /loop/checkpoints/evidence/

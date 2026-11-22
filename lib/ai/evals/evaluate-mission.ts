@@ -113,6 +113,13 @@ function auditMissionCrmChanges(input: MissionEvalInput): {
     if (event.eventType !== "crm_state_changed") continue;
     const { proposalId, targetId, tool, changedFields } = event.payload;
     const proposal = typeof proposalId === "string" ? proposals.get(proposalId) : undefined;
+    // Other approved CRM tools emit a generic change event without a verified
+    // target/diff. Do not treat that incomplete receipt as proof or as a conflict.
+    if (proposal && proposal.runId === event.runId && proposal.status === "executed" &&
+        tool === proposal.toolName && tool !== "crm_update_lead") {
+      unverified += 1;
+      continue;
+    }
     if (typeof proposalId !== "string" || !proposal ||
         proposal.runId !== event.runId || proposal.status !== "executed" ||
         proposal.toolName !== "crm_update_lead" || tool !== proposal.toolName ||

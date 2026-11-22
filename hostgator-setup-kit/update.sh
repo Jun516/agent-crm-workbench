@@ -276,6 +276,11 @@ if [ -f supabase/baseline.sql ]; then
     c_ylw "  O app pode ainda funcionar."
     orientar_banco_incompleto
   fi
+  if provisionar_leitura_ontology; then
+    c_grn "✓ leitura semântica recebeu role restrita"
+  else
+    c_ylw "⚠ leitura semântica indisponível: não foi possível conceder sua role restrita. Confira as conexões de app e administração e repita a atualização."
+  fi
   # ── E AS REGRAS DE ISOLAMENTO SÃO CONFERIDAS ──────────────────────────────
   #
   # ## Por que isto existe

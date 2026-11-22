@@ -25,6 +25,8 @@ import * as path from "node:path";
 
 import { test, expect, type Page } from "@playwright/test";
 
+import { isAppUrl } from "./utils/app-url";
+
 const CREDS_PATH = path.join(process.cwd(), ".e2e-creds.json");
 
 interface Creds {
@@ -39,7 +41,7 @@ async function login(page: Page, email: string): Promise<void> {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill(creds.password);
   await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL(/\/app\//);
+  await page.waitForURL(isAppUrl);
 }
 
 test.describe("follow-ups · modelos prontos de clínica", () => {

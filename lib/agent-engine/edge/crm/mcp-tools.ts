@@ -57,6 +57,9 @@ export interface McpTurnTools {
 
 export interface McpTurnToolOptions {
   readOnly?: boolean;
+  signal?: AbortSignal;
+  ontologyPipelineIds?: readonly string[] | null;
+  workbenchRunId?: string;
   /** Sandbox exposes this side effect only so preview can persist a proposal. */
   workbenchProposalTools?: boolean;
   /** Approval executor may mount only the exact external action being approved. */
@@ -132,6 +135,15 @@ export async function buildMcpTurnTools(
     apiTokenId: ephemeral.id,
     requestId: ids.jobId,
     knowledgeSourceIds: agentConfig.knowledgeSourceIds,
+    ontologyRuntime: {
+      versionId: agentConfig.versionId,
+      runId: ids.jobId,
+      pipelineIds: options?.ontologyPipelineIds === undefined
+        ? agentConfig.pipelineIds ?? []
+        : options.ontologyPipelineIds,
+      workbenchRunId: options?.workbenchRunId,
+      signal: options?.signal,
+    },
     supabase: cfg.supabase,
   };
   const auth: McpAuthResult = {

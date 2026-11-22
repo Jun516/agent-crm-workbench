@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { directionConsumptionLine } from "@/lib/ai/agents/mission-direction-status";
 import { randomId } from "@/lib/random-id";
 import { MissionExplicitOfferPanel } from "./MissionExplicitOfferPanel";
 
@@ -456,6 +457,11 @@ export function LeadMissionPanel({ leadId, pipelineId, open }: {
       <div className="mt-2 space-y-3">
         {missions.map((mission) => {
           const evaluation = evaluations[mission.id];
+          const directionLine = directionConsumptionLine({
+            currentDirection: mission.current_direction,
+            directionRevision: mission.direction_revision,
+            directionConsumedRevision: mission.direction_consumed_revision,
+          });
           const acceptanceAssessment = acceptanceAssessments[mission.id];
           const history = commandHistory[mission.id];
           return (
@@ -466,14 +472,7 @@ export function LeadMissionPanel({ leadId, pipelineId, open }: {
             </div>
             <p className="mt-1 text-xs text-text-muted">验收：{mission.acceptance_criteria}</p>
             {mission.current_direction && <p className="mt-1 text-xs text-text-muted">负责人方向：{mission.current_direction}</p>}
-            {mission.current_direction && typeof mission.direction_revision === "number" && (
-              <p className="mt-1 text-xs text-text-muted">
-                {typeof mission.direction_consumed_revision === "number" &&
-                  mission.direction_consumed_revision >= mission.direction_revision
-                  ? "新方向已由模型读取（不等于业务完成）"
-                  : "新方向已接受，等待模型消费"}
-              </p>
-            )}
+            {directionLine && <p className="mt-1 text-xs text-text-muted">{directionLine}</p>}
             {mission.blocked_reason && <p className="mt-1 text-xs text-text-muted">当前原因：{mission.blocked_reason}</p>}
             {mission.resolution_reason && <p className="mt-1 text-xs text-text-muted">人工结论：{mission.resolution_reason}</p>}
             {mission.customer_send_paused && <p className="mt-1 text-xs text-destructive">客户发送已暂停；Agent 可继续读取和内部协作，但不能凭旧审批发出消息。</p>}

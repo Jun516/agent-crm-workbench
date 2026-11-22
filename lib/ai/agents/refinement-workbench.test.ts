@@ -42,7 +42,7 @@ function setup() {
       parentRunId: "root",
       rootJobId: "job",
       task: "核对当前商机",
-      scope: { contactId: null, leadId: "lead", conversationId: null, pipelineId: null },
+      scope: { contactId: "contact", leadId: "lead", conversationId: null, pipelineId: null },
       budget: { maxSteps: 24, tokenBudget: 12000, costBudgetCents: 100 },
     },
     agentConfig: {
@@ -95,6 +95,7 @@ describe("Workbench refinement production adapter (offline)", () => {
     const result = await runWorkbenchRefinement(test.input);
     expect(mocks.collaboration).toHaveBeenCalledTimes(4);
     const first = mocks.collaboration.mock.calls[0]![0] as Input;
+    expect(first.customerMemoryBeforeRead).toBeUndefined();
     expect(first.plan.specialists[0]?.allowedToolIds).toEqual(["crm_get_lead"]);
     expect(first.plan.maxParallel).toBe(1);
     expect(test.filters).toContainEqual(["organization_id", "org"]);

@@ -1,5 +1,7 @@
 # HANDOFF — Marca Própria (whitelabel)
 
+> As capturas históricas identificadas apenas por nome de arquivo pertencem ao acervo local e não acompanham este repositório. Os relatos e resultados registrados à época continuam abaixo.
+
 > **LEIA ISTO ANTES DE QUALQUER COISA, EM TODA SESSÃO QUE TOCAR ESTE ÉPICO.**
 > E alimente este arquivo **a cada avanço** — não no fim, não "quando der".
 > Handoff atualizado depois é handoff que ninguém escreveu.
@@ -687,11 +689,11 @@ Cada imagem abaixo é lastro de uma afirmação desta seção:
 
 | evidência | o que ela prova |
 |---|---|
-| `evidence/marca-1-inicial.png` | estado inicial: sem cor definida, a tira **não** aparece e "De onde vem cada coisa" diz "padrão do sistema" nas três linhas |
-| `evidence/marca-2-digitado.png` | ao digitar `#7a5cd6` a tira acende com as três marcações e os contrastes 6,9:1 / 7,8:1 |
-| `evidence/marca-3-invalido.png` | hex inválido: borda de erro e **Salvar desabilitado** |
-| `evidence/marca-4-salvo.png` | o run que **reprovou**: `Could not find the table 'public.platform_branding' in the schema cache` — o banco local não tinha a migration |
-| `evidence/marca-5-recarregado.png` | depois de aplicar a 0155: sidebar e botão roxos, "Cor → definido nesta tela", cor persistida no reload |
+| evidence/marca-1-inicial.png | estado inicial: sem cor definida, a tira **não** aparece e "De onde vem cada coisa" diz "padrão do sistema" nas três linhas |
+| evidence/marca-2-digitado.png | ao digitar `#7a5cd6` a tira acende com as três marcações e os contrastes 6,9:1 / 7,8:1 |
+| evidence/marca-3-invalido.png | hex inválido: borda de erro e **Salvar desabilitado** |
+| evidence/marca-4-salvo.png | o run que **reprovou**: `Could not find the table 'public.platform_branding' in the schema cache` — o banco local não tinha a migration |
+| evidence/marca-5-recarregado.png | depois de aplicar a 0155: sidebar e botão roxos, "Cor → definido nesta tela", cor persistida no reload |
 
 ### O primeiro run REPROVOU, e o erro apareceu na tela
 
@@ -775,9 +777,9 @@ passado verde medindo o produto errado.
 de verdade sob um admin que não é platform admin. O bloco de estilo **só existe quando a
 org tem marca própria**, e no escuro o valor é outro (o claro não sobrevive por herança).
 
-Evidência: `evidence/org-1-tela.png` (a tela), `evidence/org-2-digitado.png` (a tira
-reagindo), `evidence/org-3-salvo.png` (o salvamento), `evidence/org-4-recarregado.png`
-(a persistência), `evidence/org-5-login.png` (o caso de volta, sem sessão).
+Evidência: evidence/org-1-tela.png (a tela), evidence/org-2-digitado.png (a tira
+reagindo), evidence/org-3-salvo.png (o salvamento), evidence/org-4-recarregado.png
+(a persistência), evidence/org-5-login.png (o caso de volta, sem sessão).
 
 ### O ambiente compartilhado saturou no meio, e isso é registro honesto
 

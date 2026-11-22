@@ -140,9 +140,10 @@ async function inbound(
 async function login(page: Page, email: string) {
   await page.context().clearCookies();
   await page.goto("/login");
-  await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(password);
-  await page.getByRole("button", { name: /entrar/i }).click();
+  const form = page.locator("form").filter({ has: page.locator("#email") });
+  await form.locator("#email").fill(email);
+  await form.locator("#password").fill(password);
+  await form.locator('button[type="submit"]').click();
   await page.waitForURL(/\/app(?:\/|$)/, { timeout: 60000 });
 }
 async function detail(page: Page, id: string, title: string) {
@@ -1095,6 +1096,10 @@ test("Radar recorta demandas pela RLS real, além do pool frio, e preserva gest�
   expect((await page.request.get("/api/v1/leads/at-risk")).status()).toBe(403);
   // Suporte começa em outra organização, sem membership no tenant observado.
   const home = await fixture();
+  const supportProfile = await db.auth.admin.updateUserById(home.user, {
+    user_metadata: { locale: "pt-BR" },
+  });
+  if (supportProfile.error) throw supportProfile.error;
   const pa = await db.from("platform_admins").insert({
     user_id: home.user,
     granted_by: home.user,

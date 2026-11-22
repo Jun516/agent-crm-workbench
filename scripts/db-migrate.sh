@@ -32,12 +32,28 @@ if [ ! -f "$BASELINE" ]; then
   exit 1
 fi
 
+ADMIN_URL="${SUPABASE_DB_ADMIN_URL:-$URL}"
+
 echo "==> habilitando extensões necessárias"
-psql "$URL" -v ON_ERROR_STOP=1 -q -c \
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c \
   'create extension if not exists vector with schema public;
    create extension if not exists citext with schema public;
    create extension if not exists pg_trgm with schema public;'
 
 echo "==> aplicando supabase/baseline.sql"
-psql "$URL" -v ON_ERROR_STOP=1 -f "$BASELINE"
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -f "$BASELINE"
+echo "==> verificando role de leitura semântica na conexão do app"
+if ! psql "$URL" -X -qAt -v ON_ERROR_STOP=1 -c 'begin read only; set local role ontology_reader; rollback' >/dev/null 2>&1; then
+  papel_app="$(psql "$URL" -X -qAt -v ON_ERROR_STOP=1 -c 'select current_user')"
+  if [ -z "$papel_app" ] || ! printf '%s\n' "select format('grant ontology_reader to %I', :'papel_app') \gexec" |
+    psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -v "papel_app=$papel_app" >/dev/null; then
+    echo "FATAL: não foi possível conceder ontology_reader à conexão do app" >&2
+    exit 1
+  fi
+fi
+resultado="$(psql "$URL" -X -qAt -v ON_ERROR_STOP=1 -f "$ROOT/supabase/ontology-role-check.sql")"
+if [ "$resultado" != 'ok' ]; then
+  echo "FATAL: role de leitura semântica indisponível ou insegura" >&2
+  exit 1
+fi
 echo "==> schema pi-native-crm aplicado"

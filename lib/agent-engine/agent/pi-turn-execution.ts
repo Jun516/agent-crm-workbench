@@ -1,6 +1,8 @@
 import type pg from "pg";
 
 import type { AgentRuntime } from "@/lib/agent-runtime";
+import { createCustomerMemoryCall } from "@/lib/ai/customer-memory/consumption";
+import type { CustomerMemoryScope } from "@/lib/ai/customer-memory/context";
 import {
   loadMissionBudgetForRun,
   missionBudgetBlockReason,
@@ -29,6 +31,7 @@ export async function executePiTurnModelCall(
     llmCfg: LlmEdgeConfig;
     log: Logger;
     runtime?: AgentRuntime;
+    customerMemory?: CustomerMemoryScope;
   },
   input: RunModelCallInput,
 ) {
@@ -40,18 +43,40 @@ export async function executePiTurnModelCall(
     if (reason) throw new MissionBudgetExceededError(reason);
   }
   const remainingTokens = missionBudget
-    ? missionBudget.maxTotalTokens - missionBudget.usedTokens : null;
+    ? missionBudget.maxTotalTokens - missionBudget.usedTokens
+    : null;
   const remainingCostCents = missionBudget
-    ? missionBudget.maxTotalCostCents - missionBudget.usedCostCents : null;
-  const guardedInput = missionBudget ? {
-    ...input,
-    shouldStopAfterTurn: async (turn: Parameters<NonNullable<typeof input.shouldStopAfterTurn>>[0]) =>
-      Boolean(await input.shouldStopAfterTurn?.(turn)) ||
-      turn.cumulativeUsage.totalTokens >= remainingTokens! ||
-      turn.costCents === null || turn.costCents >= remainingCostCents!,
-  } : input;
-  return runModelCall(deps.pool, deps.llmCfg, guardedInput, {
-    log: deps.log,
-    ...(deps.runtime ? { runtime: deps.runtime } : {}),
-  });
+    ? missionBudget.maxTotalCostCents - missionBudget.usedCostCents
+    : null;
+  const guardedInput = missionBudget
+    ? {
+        ...input,
+        shouldStopAfterTurn: async (
+          turn: Parameters<NonNullable<typeof input.shouldStopAfterTurn>>[0],
+        ) =>
+          Boolean(await input.shouldStopAfterTurn?.(turn)) ||
+          turn.cumulativeUsage.totalTokens >= remainingTokens! ||
+          turn.costCents === null ||
+          turn.costCents >= remainingCostCents!,
+      }
+    : input;
+  const memory = deps.customerMemory
+    ? createCustomerMemoryCall(deps.pool, guardedInput, deps.customerMemory)
+    : null;
+  try {
+    const result = await runModelCall(deps.pool, deps.llmCfg, memory?.input ?? guardedInput, {
+      log: deps.log,
+      ...(deps.runtime ? { runtime: deps.runtime } : {}),
+    });
+    await memory?.finish(result.callId, "success");
+    return result;
+  } catch (error) {
+    await memory?.finish(null, "error").catch(() => {
+      deps.log.error("customer_memory_receipt_failed", {
+        organization_id: input.tenantId,
+        code: "consumption_receipt_unavailable",
+      });
+    });
+    throw error;
+  }
 }

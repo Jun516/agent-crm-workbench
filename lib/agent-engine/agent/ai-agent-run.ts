@@ -388,12 +388,19 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
       apiTokenId: ephemeral.id,
       scopes: buildEphemeralTokenScopes({ runId: run.id, toolIds: grantedToolIds }),
     };
+    // `?? []` mantém fechado um clone sem a coluna de escopo.
+    const pipelineIds = (version as { pipeline_ids?: string[] }).pipeline_ids ?? [];
     const ctx: McpContext = {
       organizationId: run.organization_id,
       role: "ai_operator",
       actor: auth.actor,
       apiTokenId: ephemeral.id,
       requestId: run.id,
+      ontologyRuntime: {
+        versionId: run.agent_version_id,
+        runId: run.id,
+        pipelineIds,
+      },
       supabase: admin,
     };
     const handoffSignal: RuntimeHandoffSignal = { triggered: false };
@@ -403,8 +410,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
       auth,
       toolIds: version.tool_ids ?? [],
       handoffToolEnabled: version.handoff_tool_enabled,
-      // `?? []` — o clone sem a coluna 0125 nasce FECHADO.
-      pipelineIds: (version as { pipeline_ids?: string[] }).pipeline_ids ?? [],
+      pipelineIds,
       handoffSignal,
     });
 

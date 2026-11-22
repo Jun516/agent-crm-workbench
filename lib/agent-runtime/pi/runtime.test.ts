@@ -1,4 +1,4 @@
-import type { RuntimeObservation } from "../types";
+import type { RuntimeMessage, RuntimeObservation } from "../types";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -192,6 +192,71 @@ describe("PiAgentRuntime", () => {
     expect(JSON.stringify(result.events)).not.toContain(direction);
   });
 
+  it("projects semantic tool events without the private question", async () => {
+    const question = "private semantic question fixture";
+    const { runtime } = runtimeWithFaux([
+      fauxAssistantMessage(fauxToolCall("ontology_query", { question }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("done"),
+    ]);
+    const execute = vi.fn(async () => ({ content: "semantic fixture" }));
+    const result = await runtime.run({
+      systemPrompt: "Use the semantic tool.",
+      prompt: "check",
+      model,
+      maxTurns: 2,
+      tools: [{
+        name: "ontology_query",
+        description: "Query fixture",
+        inputSchema: { type: "object", properties: { question: { type: "string" } } },
+        capability: "read",
+        execute,
+      }],
+    });
+    expect(execute).toHaveBeenCalledWith({ question }, expect.anything());
+    expect(result.events).toContainEqual({
+      type: "tool_execution_start",
+      data: expect.objectContaining({ tool_name: "ontology_query", args: { redacted: true } }),
+    });
+    expect(JSON.stringify(result.events)).not.toContain(question);
+  });
+
+  it("acknowledges only the observed context for each successful transformed request", async () => {
+    const { runtime } = runtimeWithFaux([
+      fauxAssistantMessage(fauxToolCall("lookup", {}), { stopReason: "toolUse" }),
+      fauxAssistantMessage("done"),
+    ]);
+    const consumed: string[] = [];
+    let request = 0;
+    const result = await runtime.run({
+      systemPrompt: "Look up the fixture before answering.",
+      prompt: "check",
+      model,
+      maxTurns: 2,
+      tools: [{
+        name: "lookup",
+        description: "Read fixture",
+        inputSchema: { type: "object", properties: {} },
+        capability: "read",
+        execute: async () => ({ content: "fixture" }),
+      }],
+      transformContext: (messages) => [
+        ...messages,
+        { role: "user", content: `private-context-${++request}` },
+      ],
+      contextProbes: () => {
+        const probe = { id: `request-${request}`, userText: `private-context-${request}` };
+        return [{ id: "absent", userText: "removed-before-model" }, probe, probe];
+      },
+      onEvent: async (event) => {
+        if (event.type === "turn_end") await wait(10);
+        if (event.type === "model_context_consumed") consumed.push(String(event.data.probeId));
+      },
+    });
+    expect(request).toBe(2);
+    expect(consumed).toEqual(["request-1", "request-2"]);
+    expect(JSON.stringify(result.events)).not.toContain("private-context");
+  });
+
   it("does not claim direction consumption after context filtering or a failed turn", async () => {
     const direction = JSON.stringify("先按新的报价依据核对");
     const contextProbe = { id: "manager-direction:mission-1:2", userText: direction };
@@ -206,10 +271,14 @@ describe("PiAgentRuntime", () => {
     expect(filteredResult.events.some((event) => event.type === "model_context_consumed"))
       .toBe(false);
     const failed = runtimeWithFaux([fauxAssistantMessage("", { stopReason: "error" })]);
+    const stopPolicy = vi.fn(() => false);
     const failedResult = await failed.runtime.run({ systemPrompt: "CRM",
-      prompt: `负责人方向：${direction}`, model, contextProbe });
+      prompt: `负责人方向：${direction}`, model, contextProbe,
+      contextProbes: () => [{ id: "dynamic", userText: direction }],
+      shouldStopAfterTurn: stopPolicy });
     expect(failedResult.events.some((event) => event.type === "model_context_consumed"))
       .toBe(false);
+    expect(stopPolicy).not.toHaveBeenCalled();
   });
 
   it("keeps private reasoning out of the answer while preserving provider continuation", async () => {
@@ -489,6 +558,71 @@ describe("PiAgentRuntime", () => {
     expect(result.finalText).toBe("旧结论");
   });
 
+  it.each(["success", "failure"] as const)(
+    "settles required CRM events in order before advancing the run (%s)",
+    async (outcome) => {
+      const order: string[] = [];
+      const eventFailure = new Error("workbench_event_write_failed");
+      const { runtime } = runtimeWithFaux([
+        fauxAssistantMessage(fauxToolCall("lookup", {}), { stopReason: "toolUse" }),
+        () => {
+          order.push("next_model_request");
+          return fauxAssistantMessage("done");
+        },
+      ]);
+
+      const run = runtime.run({
+        systemPrompt: "Use the CRM tool before answering.",
+        prompt: "Check the contact.",
+        model,
+        tools: [
+          {
+            name: "lookup",
+            description: "Read the contact.",
+            inputSchema: { type: "object", additionalProperties: false },
+            capability: "read",
+            execute: async () => {
+              order.push("execute");
+              return { content: "contact found" };
+            },
+          },
+        ],
+        beforeToolCall: async () => {
+          order.push("authorize");
+          return undefined;
+        },
+        onEvent: async ({ type }) => {
+          if (type === "tool_execution_end") order.push(type);
+          if (type !== "tool_execution_start" && type !== "turn_end") return;
+          order.push(`${type}:begin`);
+          await wait(0);
+          if (outcome === "failure" && type === "tool_execution_start") throw eventFailure;
+          order.push(`${type}:persisted`);
+        },
+      });
+
+      if (outcome === "failure") {
+        await expect(run).rejects.toBe(eventFailure);
+        expect(order).toEqual(["tool_execution_start:begin"]);
+        return;
+      }
+
+      expect((await run).finalText).toBe("done");
+      expect(order).toEqual([
+        "tool_execution_start:begin",
+        "tool_execution_start:persisted",
+        "authorize",
+        "execute",
+        "tool_execution_end",
+        "turn_end:begin",
+        "turn_end:persisted",
+        "next_model_request",
+        "turn_end:begin",
+        "turn_end:persisted",
+      ]);
+    },
+  );
+
   it("blocks a tool in beforeToolCall without executing its side effect", async () => {
     const { runtime } = runtimeWithFaux([
       fauxAssistantMessage(fauxToolCall("send_message", { body: "hello" }), {
@@ -710,6 +844,55 @@ describe("PiAgentRuntime", () => {
       expect.arrayContaining([expect.objectContaining({ content: "previous CRM context" })]),
     );
   });
+
+  it.each(["rewrite", "remove"] as const)(
+    "keeps current tool declarations when a CRM context transform can %s the system text",
+    async (action) => {
+      const execute = vi.fn(async () => ({ content: "verified customer record" }));
+      const observeProvider = vi.fn((context: Parameters<typeof getCurrentTools>[0]) => {
+        expect(getCurrentSystemPrompt(context)).toBe(
+          action === "rewrite" ? "Current customer context" : "",
+        );
+        expect(getCurrentTools(context)).toEqual([{
+          name: "lookup_customer",
+          description: "Read the current customer record",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+        }]);
+      });
+      const { runtime } = runtimeWithFaux([
+        ({ messages }) => {
+          observeProvider(messages);
+          return fauxAssistantMessage(fauxToolCall("lookup_customer", {}), { stopReason: "toolUse" });
+        },
+        ({ messages }) => {
+          observeProvider(messages);
+          return fauxAssistantMessage("verified");
+        },
+      ]);
+
+      const result = await runtime.run({
+        systemPrompt: "Previous customer context",
+        prompt: "Check the customer record",
+        model,
+        maxTurns: 2,
+        tools: [{
+          name: "lookup_customer",
+          description: "Read the current customer record",
+          capability: "read",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          execute,
+        }],
+        transformContext: (messages) => messages.flatMap<RuntimeMessage>((message) => {
+          if (message.role !== "system") return [{ ...message }];
+          return action === "rewrite" ? [{ ...message, content: "Current customer context" }] : [];
+        }),
+      });
+
+      expect(observeProvider).toHaveBeenCalledTimes(2);
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.finalText).toBe("verified");
+    },
+  );
 
   it("rejects before opening the provider when the caller is already aborted", async () => {
     const { runtime } = runtimeWithFaux([fauxAssistantMessage("must not run")]);

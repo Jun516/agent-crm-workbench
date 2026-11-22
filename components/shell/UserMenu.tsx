@@ -29,6 +29,7 @@ export function UserMenu() {
   const user = useUser();
   const { signOut } = useAuth();
   const [isPending, startTransition] = useTransition();
+  const avatarInitials = initials(user.full_name, user.email);
 
   return (
     <div className="flex items-center gap-2">
@@ -36,10 +37,15 @@ export function UserMenu() {
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full" aria-label={t("Menu do usuário")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            aria-label={`${t("Menu do usuário")} ${avatarInitials}`.trim()}
+          >
             <Avatar className="h-8 w-8">
               {user.avatar_url && <AvatarImage src={user.avatar_url} alt="" />}
-              <AvatarFallback>{initials(user.full_name, user.email)}</AvatarFallback>
+              <AvatarFallback>{avatarInitials}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>

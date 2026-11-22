@@ -31,6 +31,8 @@ import * as path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { isAppUrl } from "./utils/app-url";
+
 const APP_URL = `http://localhost:${process.env.E2E_PORT ?? "3001"}`;
 const CREDS_PATH = path.join(process.cwd(), ".e2e-creds.json");
 const RESPONDI_FIXTURE = path.join(process.cwd(), "tests/fixtures/webhooks/respondi-imobiliario.json");
@@ -80,7 +82,7 @@ async function login(page: Page, email: string): Promise<void> {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill(creds.password);
   await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL(/\/app\//);
+  await page.waitForURL(isAppUrl);
 }
 
 /** Payload do Respondi com telefone + respondent_id únicos por execução. */

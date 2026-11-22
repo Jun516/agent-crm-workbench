@@ -89,6 +89,12 @@ describe("Jev structured confidence policy", () => {
     });
     expect(client).toHaveBeenCalledTimes(1);
   });
+  it("adopts both complete positive choices exactly at the configured threshold", async () => {
+    client.mockResolvedValue(response(answer("relevant", 0.8), answer("acceptable", 0.8)));
+    const result = await judge().judge(input());
+    expect(result).toMatchObject({ verdict: "pass", score: 100 });
+    expect(result.choiceReview?.decisions.map(({ adopted }) => adopted)).toEqual([true, true]);
+  });
   it("keeps high-confidence negative evidence as fail even if another decision is uncertain", async () => {
     client.mockResolvedValue(response(answer("irrelevant"), answer("acceptable", 0.2)));
     expect(await judge().judge(input())).toMatchObject({ verdict: "fail", score: 0 });

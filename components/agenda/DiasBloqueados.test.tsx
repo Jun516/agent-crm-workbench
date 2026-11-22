@@ -166,10 +166,11 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     // A tabela NÃO tem unicidade por data — de propósito, porque um dia pode ter
     // duas faixas (manhã num lugar, tarde noutro). Sem esta conferência, repetir
     // o mesmo período duas vezes dobraria cada linha em silêncio.
+    const diaJaCadastrado = "2026-10-08";
     jaCadastrado = [
       {
         id: "ja-existe",
-        exception_date: "2026-10-08",
+        exception_date: diaJaCadastrado,
         is_unavailable: false,
         start_minute: 840,
         end_minute: 1080,
@@ -178,7 +179,8 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     ];
     const u = userEvent.setup();
     montar();
-    await screen.findByText(/08\/10\/2026|10\/8\/2026/);
+    const dataFormatada = new Date(`${diaJaCadastrado}T12:00:00`).toLocaleDateString();
+    await screen.findByText((text) => text.includes(dataFormatada));
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
     await u.type(screen.getByLabelText("Dia"), "2026-10-01");

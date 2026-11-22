@@ -804,9 +804,10 @@ test("pacote pós-build atravessa catálogo, tenants, guia e Tarefas com recuper
     ).rejects.toThrow();
 
     await page.goto("/app/crm");
-    const contribution = page.getByTestId(
-      `extension-contribution-${installationId}-${catalogo!.pacote.cardId}`,
-    );
+    // A hidratação pode manter uma cópia oculta do hub no DOM.
+    const contribution = page
+      .getByTestId(`extension-contribution-${installationId}-${catalogo!.pacote.cardId}`)
+      .filter({ visible: true });
     await expect(contribution).toBeVisible();
     await expect(contribution.getByText(catalogo!.pacote.cardTitle, { exact: true })).toBeVisible();
     await expect(
@@ -968,9 +969,9 @@ test("pacote pós-build atravessa catálogo, tenants, guia e Tarefas com recuper
     await trocarOrganizacao(managerPage!, atores!.organizacaoA);
     await managerPage!.goto("/app/crm");
     await expect(
-      managerPage!.getByTestId(
-        `extension-contribution-${installationId}-${catalogo!.pacote.cardId}`,
-      ),
+      managerPage!
+        .getByTestId(`extension-contribution-${installationId}-${catalogo!.pacote.cardId}`)
+        .filter({ visible: true }),
     ).toBeVisible();
     expect(catalogo!.estaLigado()).toBe(false);
     await semOverflowHorizontal(managerPage!);

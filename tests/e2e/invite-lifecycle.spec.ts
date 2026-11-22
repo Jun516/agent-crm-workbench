@@ -27,6 +27,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { signInviteToken } from "../../lib/auth/invite-token";
 import { generateTotp, msUntilNextTotpWindow } from "./utils/totp";
+import { isAppUrl } from "./utils/app-url";
 
 // ---- creds do seed base (.e2e-creds.json) + do convite (.e2e-invite.json) ----
 interface BaseCreds {
@@ -92,7 +93,7 @@ async function login(page: Page, email: string): Promise<void> {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill(base.password);
   await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL(/\/app\//);
+  await page.waitForURL(isAppUrl);
 }
 
 async function loginAdminTotp(page: Page): Promise<void> {
@@ -109,7 +110,7 @@ async function loginAdminTotp(page: Page): Promise<void> {
     await page.keyboard.type(generateTotp(secret), { delay: 40 });
     try {
       // 1ª compilação de /app no dev pode ser lenta → timeout generoso
-      await page.waitForURL(/\/app\//, { timeout: 30_000 });
+      await page.waitForURL(isAppUrl, { timeout: 30_000 });
       return;
     } catch {
       if (/\/app\//.test(page.url())) return; // navegou; só passou do timeout
@@ -151,7 +152,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await page.locator("#email").fill(base.users.agent!.email);
     await page.locator("#password").fill(base.password);
     await page.getByRole("button", { name: /entrar/i }).click();
-    await page.waitForURL(/\/app\//, { timeout: 150_000 }).catch(() => {});
+    await page.waitForURL(isAppUrl, { timeout: 150_000 }).catch(() => {});
     for (const r of ["/app/inbox", "/app/kanban", "/app/contacts", "/app/settings/billing", "/app/settings/api-tokens"]) {
       await page.goto(r).catch(() => {});
     }
@@ -174,7 +175,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await mctx.close();
   });
 
-  test("1. ciclo feliz: convidar → aceitar → vira agent → cai no inbox", async ({ browser }) => {
+  test("1. ciclo feliz: convidar → aceitar → vira agent → cai na página inicial", async ({ browser }) => {
     // admin convida
     const adminCtx = await browser.newContext();
     const adminPage = await adminCtx.newPage();
@@ -205,7 +206,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await page.goto(tokenPath(acceptUrl));
     await expect(page.getByRole("heading", { name: /Aceitar convite/i })).toBeVisible();
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
 
     // depois do aceite: membership agent criada
     expect(await membershipCount()).toBe(1);
@@ -255,11 +256,11 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     // 1º aceite (reaplica)
     await page.goto(`/team/accept-invite/${token}`);
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
     // 2º aceite do MESMO token
     await page.goto(`/team/accept-invite/${token}`);
     await page.getByRole("button", { name: /Aceitar convite/i }).click();
-    await page.waitForURL(/\/app\/inbox/);
+    await page.waitForURL((url) => url.pathname === "/app");
     // sem duplicar membership
     expect(await membershipCount()).toBe(1);
     await ctx.close();

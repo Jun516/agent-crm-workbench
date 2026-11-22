@@ -58,17 +58,23 @@ function purposesDoTexto(texto: string, arquivo = "source.ts"): string[] {
       // A distinção vem da forma discriminada retornada, nunca de uma lista
       // de purposes ignorados (que esconderia um LLM homônimo real).
       const object = node.parent;
-      const enqueueResult =
+      const hasLiteralProperty = (name: string, value: string) =>
         ts.isObjectLiteralExpression(object) &&
-        ts.isReturnStatement(object.parent) &&
         object.properties.some(
-          (p) =>
-            ts.isPropertyAssignment(p) &&
-            p.name.getText(ast) === "kind" &&
-            ts.isStringLiteralLike(p.initializer) &&
-            p.initializer.text === "enqueue_turn",
+          (prop) =>
+            ts.isPropertyAssignment(prop) &&
+            prop.name.getText(ast) === name &&
+            literals(prop.initializer).includes(value),
         );
-      if (!enqueueResult) result.push(...literals(node.initializer));
+      const enqueueResult =
+        ts.isReturnStatement(object.parent) &&
+        hasLiteralProperty("kind", "enqueue_turn");
+      // Customer profile context states the consent purpose for CRM fields.
+      // Its source and authority discriminate it from a model call argument.
+      const profileContext =
+        hasLiteralProperty("source", "crm_contact_fields") &&
+        hasLiteralProperty("authority", "customer_context_only");
+      if (!enqueueResult && !profileContext) result.push(...literals(node.initializer));
     }
     ts.forEachChild(node, visit);
   };
@@ -139,6 +145,16 @@ describe("registro de pontos de IA × código", () => {
     expect(purposesDoTexto(`runModelCall(db, cfg, { purpose: "send_message" });`)).toEqual([
       "send_message",
     ]);
+    expect(
+      purposesDoTexto(`
+        const profile = {
+          source: "crm_contact_fields" as const,
+          authority: "customer_context_only" as const,
+          purpose: "profiling" as const,
+        };
+        runModelCall(db, cfg, { purpose: "profiling" });
+      `),
+    ).toEqual(["profiling"]);
   });
 
   it("a varredura enxerga o código (controle positivo)", () => {

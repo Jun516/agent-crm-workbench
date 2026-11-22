@@ -1,6 +1,7 @@
 import type { runWorkbenchCollaboration } from "./workbench-collaboration";
 import { runWorkbenchCollaboration as executeCollaboration } from "./workbench-collaboration";
 import { workbenchToolEffect } from "./tool-effects";
+import { REFINEMENT_COLLABORATION_PLAN_KEY } from "./collaboration";
 import { appendWorkbenchEvent } from "./workbench-events";
 import {
   REFINEMENT_REVISION,
@@ -129,7 +130,7 @@ export async function runWorkbenchRefinement(
           agentConfig: input.agentConfig,
           signal,
           plan: {
-            key: "harness_refinement_v1",
+            key: REFINEMENT_COLLABORATION_PLAN_KEY,
             revision: REFINEMENT_REVISION,
             maxParallel: 1,
             maxTotalToolCalls: 6,

@@ -425,3 +425,9 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 
 | `20261002032000` | `0407_ai_wiki_evidence` | Immutable current Wiki snapshots with source-version manifest and per-organization ownership. |
 | `20261003010000` | `0408_cliente_agenda_guc_valido` | Forward fix: legal pi_native custom GUC restores appointment-derived customer recognition and its protected-column trigger without modifying historical migrations or data. |
+| `20261112130000` | `0409_customer_memory_lifecycle` | Issue 28: SQL L1 freshness/locks/replacement lineage, service-only evidence-backed L2 candidates, conflict and used-memory receipts; privacy cleanup extends without changing Mem0 write reconciliation. |
+| `20261112141000` | `0410_customer_memory_events` | Issue 28: durable extraction on service close, idle checkpoints and task completion; business-change conflict checks; tenant-local nightly maintenance, queue vocabulary and scoped order conflicts. |
+| `20261112160000` | `0411_customer_memory_consumption` | Issue 28: model-consumed request receipts for workbench, conversational turns and reply drafts; versioned usage metadata without a second customer-fact store. |
+| `20261114100000` | `0412_ontology_read_role` | No-login, RLS-constrained, column-limited role for ontology read templates. |
+| `20261114120000` | `0413_workbench_atomic_events` | Sequencia eventos do Workbench sob o lock da linha do run, compartilhado com transações de cancelamento e aprovação; execução restrita a service_role. |
+| `20261114130000` | `0414_ontology_role_set_compat` | Replay-safe ontology role bootstrap on PostgreSQL 16 and later. |

@@ -1,15 +1,18 @@
 # Optional Agent services: Mem0, WeKnora and Langfuse
 
-Status: first working integration increment, default off. This change installs **CRM adapters**,
-not three running vendor platforms. No service credentials, OAuth grant, model call, private data
+Status: optional integrations remain default off. The customer-memory review loop is core;
+its full contract is [customer-memory-loop.md](../specs/customer-memory-loop.md). This repository
+installs **CRM adapters**, not three running vendor platforms. No service credentials, OAuth grant, model call, private data
 export or vendor deployment is performed by migration or application startup.
 
 ## Responsibilities and activation
 
 - SQL CRM records, Mission state, approvals and the published organization policy remain authoritative.
 - Mem0 ranks customer preferences, human-confirmed facts and communication context. It cannot
-  publish company/product policy or alter approval state. This increment does **not** automatically
-  extract all chats into memory. A manager confirms each fact in the contact detail screen.
+  publish company/product policy or alter approval state. Scoped close/checkpoint/task events can
+  extract evidence-backed L2 suggestions through the CRM model gateway. They never automatically
+  become L1: the current customer owner or a manager confirms them in the report footer or contact
+  panel. Colleagues can propose; managers arbitrate conflicts. Extraction does not require Mem0.
 - WeKnora supplies company/product Wiki pages. Generated prose is derived evidence, never approval
   of a price, delivery promise or contract. Commercial commitments still require approved materials.
 - Langfuse receives actual Pi model/tool boundary measurements and CRM Eval scores. It is not a
@@ -89,17 +92,42 @@ or assigned a public port by this change.
 
 ## Memory lifecycle and failure behavior
 
-`POST /api/v1/ai/customer-memory` requires manager role, a support-write guard, `contact_id`,
-`request_key`, one permitted category, `body`, and `confirmed: true`. The contact must currently
+`POST /api/v1/ai/customer-memory` requires agent-level route access, a fresh transactional
+owner/manager confirmation check, a support-write guard, `contact_id`, `request_key`, one
+permitted category, `body`, and `confirmed: true`. Membership revocation and current assignment
+are rechecked for writes; colleagues use the candidate proposal route. The contact must currently
 belong to the authenticated organization and be neither anonymized nor merged. The SQL fact and its
 outbox item commit atomically; same-key/same-content retries reuse the fact, and key/content collisions
 fail. An ambiguous COMMIT acknowledgment returns an unconfirmed-outcome response: reuse the same key.
 
-`crm_get_contact` and `crm_get_conversation_history` consume approved memory. Conversation checkpoints
-retain their existing conversation/service/demand boundary and are not replaced. Mem0 can rank only
-IDs in the CRM-owned map; model context uses the **current SQL fact**, never untrusted remote text.
-Remote failure falls back to the same confirmed local facts; contact privacy is checked again after
-retrieval. Disabling the provider stops external retrieval; ordinary checkpoint behavior continues.
+`crm_get_contact` and `crm_get_conversation_history` consume approved memory. In scoped native
+workbench, customer-conversation, follow-up timing and draft calls, each model request refreshes separate L0 business,
+L1 confirmed and current-service L3 blocks; L4 policy stays in the knowledge channel. TTL removes
+expired facts, valid locks are selected independently of search, and review-due facts are marked.
+Follow-up timing binds the original conversation and rechecks the current service boundary;
+context-refresh failures remain errors even if Pi returns an empty assistant result.
+L2 never enters factual context. Structured business attributes are rejected by both writers;
+quoted customer text cannot replace CRM business fields or become company policy.
+
+Mem0 can rank only IDs verified against the current organization/contact/hash in SQL, including
+owned semantic hits outside the local lexical window. Model context uses the **current SQL fact**,
+never untrusted remote text. Remote failure falls back to local selection with honest provider
+status and coverage; incomplete or missing recall does not establish absence. Contact privacy is
+checked again after retrieval. Disabling Mem0 stops external retrieval without disabling the
+local confirmation loop or service-scoped checkpoints.
+
+Report/draft panels show model-consumed memory IDs, revisions and permitted source links.
+Corrections flag the exact used revision for review, without rewriting its body or unlocking it.
+Nightly maintenance expires temporary facts, conservatively groups/merges exact candidate
+repeats and queues bounded, durable cross-page conflict review; it does not promote new L1.
+Background state distinguishes unavailable from an empty queue and links model configuration.
+Current owners/managers can retry eligible failed work using its revision and idempotency key,
+retaining the original source/time boundary and producing only L2. Operations remain folded.
+
+Manager metrics and native SQL-receipt policy evaluation are part of the core loop. For a recall
+strategy regression (including an RSI proposal), run `pnpm --silent eval:customer-memory` with
+Docker available; inspect its JSON receipt and exit code. The command measures deterministic
+trust/privacy/recall/consumption rules, not natural-language correctness or a live provider.
 
 The sync worker first reconciles the exact receipt using both opaque customer and receipt scopes.
 A timed-out or crashed ADD is never blindly repeated. `sending`/`unknown` outcomes stay explicitly

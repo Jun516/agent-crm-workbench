@@ -34,7 +34,7 @@ import { lerCreds, loginComoAdmin } from "./helpers/login-admin";
 const CAMPO_DE_BUSCA = "Buscar conversas";
 
 /**
- * ⏱️ 60s, e o número saiu de MEDIÇÃO — não de chute.
+ * ⏱️ 90s para o login com MFA mais a prova na tela.
  *
  * O `beforeEach` loga com MFA, e o helper de login espera a próxima janela do
  * TOTP quando o código anterior já foi usado: até 30 segundos parados antes de a
@@ -45,8 +45,10 @@ const CAMPO_DE_BUSCA = "Buscar conversas";
  * 22.1s · 30.8s✘ · 6.6s. Os dois vermelhos estouraram o teto com a asserção mal
  * tendo começado, e o mesmo caso passou em 6.3s quando a janela do TOTP caiu a
  * favor. Não é o produto: é o relógio.
+ * A rodada de 22/11 esgotou 60s dentro do `beforeEach`, ainda esperando a
+ * próxima janela. A margem de login precisa comportar uma nova tentativa.
  */
-test.describe.configure({ timeout: 60_000 });
+test.describe.configure({ timeout: 90_000 });
 
 test.beforeEach(async ({ page }) => {
   await loginComoAdmin(page, lerCreds());

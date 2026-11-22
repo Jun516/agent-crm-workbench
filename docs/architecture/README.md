@@ -17,6 +17,7 @@ ser fonte sem ninguém decidir isso.
 | arquivo | escopo |
 |---|---|
 | `mcp-tool-grants.architecture.json` | seleção de ferramentas → token temporário com nomes exatos → descoberta e chamada MCP/ponte interna → verificações e auditoria |
+| `ontology-lite.architecture.json` | catálogo semântico versionado, plano de consulta restrito, leitura sob RLS e recibos na bancada |
 | `harness-refinement.architecture.json` | candidatos somente leitura, Probe determinístico, experiência de método com baixa autoridade, orçamento compartilhado e síntese na bancada |
 | `chat-first-runtime-parity.architecture.json` | memória publicada e checkpoints com fronteira → Pi/Harness → observações → evidência reautorizada/Eval → Workbench e comando de envio |
 | `prospeccao-nativa.architecture.json` | busca comercial, fila gradual, configuração conversacional persistente, sandbox e assistente de voz opcional |

@@ -5,6 +5,12 @@ import type {
   AgentSpecialistResult,
   AgentSpecialistTask,
 } from "@/lib/ai/agents/collaboration";
+import { isRefinementCandidatePlan } from "@/lib/ai/agents/collaboration";
+import {
+  expertConflictEventFields,
+  governParentOnExpertConflict,
+  unresolvedExpertConflictText,
+} from "@/lib/ai/agents/expert-conflict-governance";
 
 export interface DurableSpecialistRun {
   id: string;
@@ -179,6 +185,7 @@ export class BoundedAgentCollaborationRuntime {
         status: "failed",
         results: [],
         conflicts: [],
+        governance: null,
         usage: { toolCalls: 0, inputTokens: 0, outputTokens: 0, costCents: 0, modelTurns: 0 },
       };
     const timeout = AbortSignal.timeout(plan.timeoutMs);
@@ -322,12 +329,16 @@ export class BoundedAgentCollaborationRuntime {
       results.find((result) => result.specialistKey === task.specialist.key)!,
     );
     const conflicts = detectCollaborationConflicts(ordered);
-    for (const conflict of conflicts)
+    const governance = isRefinementCandidatePlan(plan) ? null : governParentOnExpertConflict(conflicts);
+    for (const conflict of conflicts) {
+      const material = conflict.code === "evidence_disagreement" || conflict.code === "stale_state";
       await appendParent("collaboration_conflict", {
         code: conflict.code,
         specialistKeys: conflict.specialistKeys,
         field: conflict.field,
+        ...(material ? expertConflictEventFields(governance) : {}),
       });
+    }
     const completed = ordered.filter((result) => result.status === "complete").length;
     const failed = ordered.filter((result) => result.status === "failed").length;
     const status =
@@ -341,6 +352,7 @@ export class BoundedAgentCollaborationRuntime {
       status,
       results: ordered,
       conflicts,
+      governance,
       usage: {
         toolCalls,
         inputTokens: ordered.reduce((sum, result) => sum + result.usage.inputTokens, 0),
@@ -356,12 +368,19 @@ export class BoundedAgentCollaborationRuntime {
       failedSpecialists: failed,
       toolCalls,
       conflictCount: conflicts.length,
+      ...expertConflictEventFields(governance),
     });
     return outcome;
   }
 }
 
 export function formatCollaborationContext(outcome: AgentCollaborationOutcome): string {
+  if (outcome.governance) {
+    return [
+      unresolvedExpertConflictText(outcome.governance),
+      "父 Agent 不得选择一边，不得把任一专家的观察写成 CRM 数据。",
+    ].join("\n\n");
+  }
   const maxSummaryCharacters = 2_400;
   const sections = outcome.results.map((result) => {
     const missing = result.missingMaterial.length

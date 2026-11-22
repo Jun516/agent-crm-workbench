@@ -203,11 +203,11 @@ describe("real integration controls", () => {
           posts.push(JSON.parse(init.body));
           return j({ error: { message: "保存结果未确认，请按相同键重试" } }, 503);
         }
-        return j({ data: [] });
+        return j({ data: [], meta: { can_confirm: true, can_arbitrate: true } });
       }),
     );
     render(<CustomerMemoryPanel contactId="a0000000-0000-4000-8000-000000000001" />);
-    const input = screen.getByRole("textbox", { name: "已确认的记忆内容" });
+    const input = await screen.findByRole("textbox", { name: "记忆内容" });
     fireEvent.change(input, { target: { value: "Prefers email" } });
     fireEvent.click(screen.getByRole("button", { name: "确认并保存" }));
     await screen.findByRole("alert");
@@ -219,7 +219,7 @@ describe("real integration controls", () => {
     expect(posts[0]!.request_key).toBe(posts[1]!.request_key);
     expect(posts[0]).toMatchObject({
       confirmed: true,
-      category: "preference",
+      category: "communication_context",
       body: "Prefers email",
     });
   });

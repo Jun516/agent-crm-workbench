@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentCollaborationOutcome, AgentSpecialistResult } from "./collaboration";
+import { REFINEMENT_COLLABORATION_PLAN_KEY } from "./collaboration";
 import { detectCollaborationConflicts } from "./collaboration-runtime";
 import { inspectProductFinalAnswer } from "./final-answer";
 
@@ -275,7 +276,8 @@ export async function runBoundedRefinement(input: {
   return {
     state,
     collaboration: {
-      planKey: "harness_refinement_v1",
+      governance: null,
+      planKey: REFINEMENT_COLLABORATION_PLAN_KEY,
       status:
         selection.current &&
         conflicts.length === 0 &&
